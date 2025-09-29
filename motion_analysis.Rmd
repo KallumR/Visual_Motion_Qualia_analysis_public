@@ -179,11 +179,12 @@ data <- rescale(data)
 # Load necessary libraries
 library(ggplot2)
 library(dplyr)
+library(ggpubr) # for theme_pubr()
 
-  ### This computes the double pass correlation and plots it
-  ### First it selects per participant, then splits their data into two blocks 
-  ### Then computes the correlation and bifurcates the data into separate data frames 
-  ### Also checks the set double pass cutoff against the critical R value  
+### This computes the double pass correlation and plots it
+### First it selects per participant, then splits their data into two blocks 
+### Then computes the correlation and bifurcates the data into separate data frames 
+### Also checks the set double pass cutoff against the critical R value  
 
 ## Select the double pass correlation cutoff
 dp_cutoff = 0.1603
@@ -226,7 +227,6 @@ double.cor.summary <- data %>%
   group_by(participant) %>%
   summarise(correlation = double.cor(dissimilarity))
 
-
 # Subset based on correlation threshold
 double.cor.acceptable <- filter(double.cor.summary, correlation >= dp_cutoff)
 double.cor.unacceptable <- filter(double.cor.summary, correlation < dp_cutoff)
@@ -235,14 +235,14 @@ double.cor.unacceptable <- filter(double.cor.summary, correlation < dp_cutoff)
 trialdata <- filter(data, participant %in% double.cor.acceptable$participant) 
 lowdpdata <- filter(data, participant %in% double.cor.unacceptable$participant)
 
-# Plotting function for double-pass correlations
+# Plotting function for double-pass correlations (returns plot object)
 plot_double_pass_correlation <- function(data, title, cutoff = NULL) {
   p <- ggplot(data, aes(y = correlation, x = factor(1))) +
-    geom_violin(trim = FALSE, fill = "skyblue", color = "blue") +
+    geom_violin(trim = TRUE, fill = "skyblue", color = "blue") +
     geom_jitter(width = 0.1, size = 2.5) +
     xlab(NULL) +  ylab("Spearman's Correlation") +
     scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +
-    theme_pubr()+
+    theme_pubr() +
     theme(
       plot.title = element_text(hjust = 0.5, face = "plain", size = 20),
       axis.title.x = element_text(size = 35, face = "plain"),
@@ -254,25 +254,19 @@ plot_double_pass_correlation <- function(data, title, cutoff = NULL) {
       panel.grid.major = element_line(color = "#d6d6d6"),
       panel.grid.minor = element_blank() 
     )
-
-  if (!is.null(dp_cutoff)) {
-    p <- p + geom_hline(yintercept = dp_cutoff, linewidth = 1.5, colour = 'red', linetype = 'dashed') +
-      annotate("text", x = 1.4, y = dp_cutoff - 0.07, size = 10, label = paste("Cut-off:", dp_cutoff), vjust = 0, colour = 'red')
+  if (!is.null(cutoff)) {
+    p <- p + geom_hline(yintercept = cutoff, linewidth = 1.5, colour = 'red', linetype = 'dashed') +
+      annotate("text", x = 1.4, y = cutoff - 0.07, size = 10, label = paste("Cut-off:", cutoff), vjust = 0, colour = 'red')
   }
-  
-  print(p)
+  return(p)
 }
 
-# Plot correlations for all data, acceptable, and unacceptable
-plot_double_pass_correlation(double.cor.acceptable, "DP Correlation - Acceptable", dp_cutoff)
+# Create and save plots
+p_accept <- plot_double_pass_correlation(double.cor.acceptable, "DP Correlation - Acceptable", dp_cutoff)
+ggsave("DP_Correlation_Acceptable_Data.png", plot = p_accept, width = 10, height = 10, dpi = 300)
 
-# Saving the plot (Example for one; repeat as necessary)
-ggsave("DP_Correlation_Acceptable_Data.png", plot = last_plot(), width = 10, height = 10, dpi = 300)
-
-plot_double_pass_correlation(double.cor.summary, "DP Correlation - All Data", dp_cutoff)
-
-# Saving the plot (Example for one; repeat as necessary)
-ggsave("DP_Correlation_All_Data.png", plot = last_plot(), width = 10, height = 10, dpi = 300)
+p_all <- plot_double_pass_correlation(double.cor.summary, "DP Correlation - All Data", dp_cutoff)
+ggsave("DP_Correlation_All_Data.png", plot = p_all, width = 10, height = 10, dpi = 300)
 
 # Save trial data for acceptable correlations to CSV
 write.csv(trialdata, "trialdata.csv", row.names = FALSE)
@@ -900,15 +894,15 @@ p_hist <- ggplot(counts_combined, aes(x = count)) +
     plot.title = element_text(hjust = 0.5, size = 12),
     axis.title.x = element_text(size = 30),
     axis.title.y = element_text(size = 30, margin = margin(r = 10)),
-    axis.text.x = element_text(size = 16),
-    axis.text.y = element_text(size = 20),
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
     axis.line = element_line(size = 1.5),
     panel.background = element_rect(fill = "white"),
     panel.grid.major = element_line(color = "white"),
     panel.grid.minor = element_blank()
   ) +
-  scale_x_continuous(expand = c(0, 0), limits = c(10, 50), breaks = seq(10, 50, by = 2)) +
-  scale_y_continuous(expand = c(0, 0), limits = c(0, 500), breaks = seq(0, 500, by = 50))
+  scale_x_continuous(expand = c(0, 0), limits = c(10, 40), breaks = seq(10, 40, by = 4)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 300), breaks = seq(0, 500, by = 50))
 
 # Step 10: Save and print all plots
 ggsave("countdata_block1.png", plot = p_countdata1, width = 10, height = 10, dpi = 300)
@@ -2499,17 +2493,17 @@ model_abs_SF_Diff                     <- lmer(z_dissimilarity ~ abs_SF_Diff + (1
 
 model_DirDiff                         <- lmer(z_dissimilarity ~ DirectionDiff + (1|participant), data = trialdata, REML = FALSE)
 model_DirDiff_abs_SF_Diff             <- lmer(z_dissimilarity ~ DirectionDiff + abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
-model_DirDiff_SF_Interaction          <- lmer(z_dissimilarity ~ DirectionDiff * abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
+model_DirDiff_SF_Interaction          <- lmer(z_dissimilarity ~ DirectionDiff + abs_SF_Diff + DirectionDiff * abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
 
 
 model_OrientationDiff                 <- lmer(z_dissimilarity ~ OrientationDiff + (1|participant), data = trialdata, REML = FALSE)
 model_OrientationDiff_abs_SF_Diff     <- lmer(z_dissimilarity ~ OrientationDiff + abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
-model_OrientationDiff_SF_Interaction  <- lmer(z_dissimilarity ~ OrientationDiff * abs_SF_Diff  + (1|participant), data = trialdata, REML = FALSE)
+model_OrientationDiff_SF_Interaction  <- lmer(z_dissimilarity ~ OrientationDiff + abs_SF_Diff + OrientationDiff * abs_SF_Diff  + (1|participant), data = trialdata, REML = FALSE)
 
 
 model_Categorical                     <- lmer(z_dissimilarity ~ Categorical + (1|participant), data = trialdata, REML = FALSE)
 model_Categorical_abs_SF_Diff         <- lmer(z_dissimilarity ~ Categorical + abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
-model_Categorical_SF_Interaction      <- lmer(z_dissimilarity ~ Categorical * abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
+model_Categorical_SF_Interaction      <- lmer(z_dissimilarity ~ Categorical + abs_SF_Diff + (Categorical * abs_SF_Diff) + (1|participant), data = trialdata, REML = FALSE)
 
 
 #############################
@@ -7534,6 +7528,84 @@ for (tt in trial_types) {
 
 ```
 
+```{r, non para pilot stat}
+library(dplyr)
+library(purrr)   # for reduce()
+
+# Function to compute angular difference (0°–180°)
+angular_diff <- function(a, b) {
+  diff <- abs(a - b) %% 360
+  pmin(diff, 360 - diff)
+}
+
+# Add (and round) angular difference column to avoid floating-point equality issues
+pilot_trialdata <- pilot_trialdata %>%
+  mutate(angular_diff = round(angular_diff(circle1_ori, circle2_ori)))
+
+# Define trial types
+trial_types <- c("0.005_trial", "0.04_trial", "0.3_trial")
+
+# Loop over trial types
+for (tt in trial_types) {
+  cat("\nTrial Type:", tt, "\n")
+  subset_data <- subset(pilot_trialdata, trial_type == tt)
+
+  # Compute participant-level means for each condition
+  df_180 <- subset(subset_data, angular_diff == 180) %>%
+    group_by(participant) %>%
+    summarise(mean_180 = mean(dissimilarity, na.rm = TRUE), .groups = "drop")
+
+  df_0 <- subset(subset_data, angular_diff == 0) %>%
+    group_by(participant) %>%
+    summarise(mean_0 = mean(dissimilarity, na.rm = TRUE), .groups = "drop")
+
+  df_less_than_180 <- subset(subset_data, angular_diff < 180 & angular_diff != 0) %>%
+    group_by(participant) %>%
+    summarise(mean_lt180 = mean(dissimilarity, na.rm = TRUE), .groups = "drop")
+
+  # Merge all three by participant
+  merged <- reduce(list(df_180, df_0, df_less_than_180), full_join, by = "participant")
+
+  # Descriptive stats
+  cat("Mean dissimilarity at 180°:", mean(merged$mean_180, na.rm = TRUE), "\n")
+  cat("SD at 180°:", sd(merged$mean_180, na.rm = TRUE), "\n")
+
+  # --- Wilcoxon signed-rank tests (paired, nonparametric) ---
+
+  # 180° vs 0°
+  idx_180_0 <- !is.na(merged$mean_180) & !is.na(merged$mean_0)
+  if (sum(idx_180_0) >= 2) {
+    cat("Wilcoxon signed-rank (paired) 180° vs 0° (n =", sum(idx_180_0), "participants):\n")
+    res_180_vs_0 <- wilcox.test(
+      merged$mean_180[idx_180_0],
+      merged$mean_0[idx_180_0],
+      paired = TRUE,
+      exact = FALSE,
+      alternative = "two.sided"
+    )
+    print(res_180_vs_0)
+  } else {
+    cat("Not enough paired data for 180° vs 0°\n")
+  }
+
+  # 180° vs <180°
+  idx_180_lt180 <- !is.na(merged$mean_180) & !is.na(merged$mean_lt180)
+  if (sum(idx_180_lt180) >= 2) {
+    cat("Wilcoxon signed-rank (paired) 180° vs <180° (n =", sum(idx_180_lt180), "participants):\n")
+    res_180_vs_lt180 <- wilcox.test(
+      merged$mean_180[idx_180_lt180],
+      merged$mean_lt180[idx_180_lt180],
+      paired = TRUE,
+      exact = FALSE,
+      alternative = "two.sided"
+    )
+    print(res_180_vs_lt180)
+  } else {
+    cat("Not enough paired data for 180° vs <180°\n")
+  }
+}
+```
+
 
 ```{r, pilot asym}
 library(dplyr)
@@ -7579,4 +7651,63 @@ for (tt in trial_types) {
   }
 }
 
+```
+
+```{r, non para}
+library(dplyr)
+
+# Function to compute angular difference
+angular_diff <- function(a, b) {
+  diff <- abs(a - b) %% 360
+  pmin(diff, 360 - diff)
+}
+
+# --- Prepare data once ---
+# 1) Add angular_diff
+# 2) (Optional) round angular_diff to avoid floating-point equality issues
+pilot_trialdata <- pilot_trialdata %>%
+  mutate(angular_diff = angular_diff(circle1_ori, circle2_ori),
+         angular_diff = round(angular_diff))
+
+# 3) Summarize to participant means per trial_type and angle
+data_sum <- pilot_trialdata %>%
+  group_by(trial_type, participant, angular_diff) %>%
+  summarise(mean_dissim = mean(dissimilarity, na.rm = TRUE), .groups = "drop")
+
+# Define trial types and symmetric pairs
+trial_types <- c("0.005_trial", "0.04_trial", "0.3_trial")
+angle_pairs <- list(c(18, 162), c(36, 144), c(54, 126), c(72, 108))
+
+# Loop through trial types and angle pairs
+for (tt in trial_types) {
+  cat("\nTrial Type:", tt, "\n")
+  data_tt <- filter(data_sum, trial_type == tt)
+  
+  for (pair in angle_pairs) {
+    a1 <- pair[1]
+    a2 <- pair[2]
+    
+    df_a1 <- data_tt %>%
+      filter(angular_diff == a1) %>%
+      select(participant, mean_a1 = mean_dissim)
+    
+    df_a2 <- data_tt %>%
+      filter(angular_diff == a2) %>%
+      select(participant, mean_a2 = mean_dissim)
+    
+    # Merge for paired comparison (within-participant)
+    merged <- inner_join(df_a1, df_a2, by = "participant")
+    
+    if (nrow(merged) >= 2) {
+      cat(sprintf("Wilcoxon signed-rank (paired) for %d° vs %d° (n=%d participants):\n",
+                  a1, a2, nrow(merged)))
+      # exact = FALSE handles ties/zeros and larger samples more reliably
+      res <- wilcox.test(merged$mean_a1, merged$mean_a2,
+                         paired = TRUE, exact = FALSE, alternative = "two.sided")
+      print(res)
+    } else {
+      cat(sprintf("Not enough paired data for %d° vs %d°.\n", a1, a2))
+    }
+  }
+}
 ```
