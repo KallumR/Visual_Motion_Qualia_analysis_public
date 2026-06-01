@@ -179,11 +179,12 @@ data <- rescale(data)
 # Load necessary libraries
 library(ggplot2)
 library(dplyr)
+library(ggpubr) # for theme_pubr()
 
-  ### This computes the double pass correlation and plots it
-  ### First it selects per participant, then splits their data into two blocks 
-  ### Then computes the correlation and bifurcates the data into separate data frames 
-  ### Also checks the set double pass cutoff against the critical R value  
+### This computes the double pass correlation and plots it
+### First it selects per participant, then splits their data into two blocks 
+### Then computes the correlation and bifurcates the data into separate data frames 
+### Also checks the set double pass cutoff against the critical R value  
 
 ## Select the double pass correlation cutoff
 dp_cutoff = 0.1603
@@ -226,7 +227,6 @@ double.cor.summary <- data %>%
   group_by(participant) %>%
   summarise(correlation = double.cor(dissimilarity))
 
-
 # Subset based on correlation threshold
 double.cor.acceptable <- filter(double.cor.summary, correlation >= dp_cutoff)
 double.cor.unacceptable <- filter(double.cor.summary, correlation < dp_cutoff)
@@ -235,14 +235,14 @@ double.cor.unacceptable <- filter(double.cor.summary, correlation < dp_cutoff)
 trialdata <- filter(data, participant %in% double.cor.acceptable$participant) 
 lowdpdata <- filter(data, participant %in% double.cor.unacceptable$participant)
 
-# Plotting function for double-pass correlations
+# Plotting function for double-pass correlations (returns plot object)
 plot_double_pass_correlation <- function(data, title, cutoff = NULL) {
   p <- ggplot(data, aes(y = correlation, x = factor(1))) +
-    geom_violin(trim = FALSE, fill = "skyblue", color = "blue") +
+    geom_violin(trim = TRUE, fill = "skyblue", color = "blue") +
     geom_jitter(width = 0.1, size = 2.5) +
     xlab(NULL) +  ylab("Spearman's Correlation") +
     scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +
-    theme_pubr()+
+    theme_pubr() +
     theme(
       plot.title = element_text(hjust = 0.5, face = "plain", size = 20),
       axis.title.x = element_text(size = 35, face = "plain"),
@@ -254,25 +254,19 @@ plot_double_pass_correlation <- function(data, title, cutoff = NULL) {
       panel.grid.major = element_line(color = "#d6d6d6"),
       panel.grid.minor = element_blank() 
     )
-
-  if (!is.null(dp_cutoff)) {
-    p <- p + geom_hline(yintercept = dp_cutoff, linewidth = 1.5, colour = 'red', linetype = 'dashed') +
-      annotate("text", x = 1.4, y = dp_cutoff - 0.07, size = 10, label = paste("Cut-off:", dp_cutoff), vjust = 0, colour = 'red')
+  if (!is.null(cutoff)) {
+    p <- p + geom_hline(yintercept = cutoff, linewidth = 1.5, colour = 'red', linetype = 'dashed') +
+      annotate("text", x = 1.4, y = cutoff - 0.07, size = 10, label = paste("Cut-off:", cutoff), vjust = 0, colour = 'red')
   }
-  
-  print(p)
+  return(p)
 }
 
-# Plot correlations for all data, acceptable, and unacceptable
-plot_double_pass_correlation(double.cor.acceptable, "DP Correlation - Acceptable", dp_cutoff)
+# Create and save plots
+p_accept <- plot_double_pass_correlation(double.cor.acceptable, "DP Correlation - Acceptable", dp_cutoff)
+ggsave("DP_Correlation_Acceptable_Data.png", plot = p_accept, width = 10, height = 10, dpi = 300)
 
-# Saving the plot (Example for one; repeat as necessary)
-ggsave("DP_Correlation_Acceptable_Data.png", plot = last_plot(), width = 10, height = 10, dpi = 300)
-
-plot_double_pass_correlation(double.cor.summary, "DP Correlation - All Data", dp_cutoff)
-
-# Saving the plot (Example for one; repeat as necessary)
-ggsave("DP_Correlation_All_Data.png", plot = last_plot(), width = 10, height = 10, dpi = 300)
+p_all <- plot_double_pass_correlation(double.cor.summary, "DP Correlation - All Data", dp_cutoff)
+ggsave("DP_Correlation_All_Data.png", plot = p_all, width = 10, height = 10, dpi = 300)
 
 # Save trial data for acceptable correlations to CSV
 write.csv(trialdata, "trialdata.csv", row.names = FALSE)
@@ -343,7 +337,7 @@ library(ggrepel) # For repelling labels with arrows
 library(ggpubr)  # For theme_pubr()
 
 # Function to calculate double-pass correlation with the specified method
-double.cor <- function(dissimilarity, method = "pearson") {
+double.cor <- function(dissimilarity, method = "spearman") {
   if(length(dissimilarity) != 300) {
     cat("Warning: dissimilarity vector does not have 300 elements\n")
   }
@@ -505,7 +499,7 @@ library(ggExtra)  # For adding marginal histograms
 library(ggpubr)   # For pubr theme
 
 # Function to calculate double-pass correlation with the specified method
-double.cor <- function(dissimilarity, method = "pearson") {
+double.cor <- function(dissimilarity, method = "spearman") {
   if(length(dissimilarity) != 300) {
     cat("Warning: dissimilarity vector does not have 300 elements\n")
   }
@@ -900,15 +894,15 @@ p_hist <- ggplot(counts_combined, aes(x = count)) +
     plot.title = element_text(hjust = 0.5, size = 12),
     axis.title.x = element_text(size = 30),
     axis.title.y = element_text(size = 30, margin = margin(r = 10)),
-    axis.text.x = element_text(size = 16),
-    axis.text.y = element_text(size = 20),
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 30),
     axis.line = element_line(size = 1.5),
     panel.background = element_rect(fill = "white"),
     panel.grid.major = element_line(color = "white"),
     panel.grid.minor = element_blank()
   ) +
-  scale_x_continuous(expand = c(0, 0), limits = c(10, 50), breaks = seq(10, 50, by = 2)) +
-  scale_y_continuous(expand = c(0, 0), limits = c(0, 500), breaks = seq(0, 500, by = 50))
+  scale_x_continuous(expand = c(0, 0), limits = c(10, 40), breaks = seq(10, 40, by = 4)) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 300), breaks = seq(0, 500, by = 50))
 
 # Step 10: Save and print all plots
 ggsave("countdata_block1.png", plot = p_countdata1, width = 10, height = 10, dpi = 300)
@@ -1405,6 +1399,9 @@ dissimilarity_matrix <- matrix_data[ordered_row_names, ordered_col_names]
 
 print(rownames(dissimilarity_matrix))
 
+write.csv(dissimilarity_matrix, "raw_dir_dissimilarity_matrix.csv", row.names = TRUE)
+
+
 # Convert the symmetrised matrix back to a long format for ggplot
 dissimilarity_df <- as.data.frame(as.table(dissimilarity_matrix))
 colnames(dissimilarity_df) <- c("circle1_key", "circle2_key", "mean_dissimilarity")
@@ -1697,11 +1694,11 @@ create_modified_plot_with_icons <- function(mds_df, title) {
     ggtitle(title) +
     theme_pubr() +
     theme(
-      axis.title.x = element_text(size = 40, face = "plain"),
+      axis.title.x = element_text(size = 45, face = "plain"),
       axis.text.x = element_text(size = 40, face = "plain"),
-      axis.title.y = element_text(size = 40, face = "plain"),
+      axis.title.y = element_text(size = 45, face = "plain"),
       axis.text.y = element_text(size = 40, face = "plain"),
-      axis.line = element_line(size = 1.1),
+      axis.line = element_line(size = 1.5),
       legend.title = element_text(size = 14)
     ) +
    # geom_vline(xintercept = 0, linetype = "solid", size = 0.25, color = "black") +
@@ -1735,6 +1732,152 @@ if (num_positive_eigenvalues >= 2) {
 }
 
 ```
+## Reviewer follow up
+```{r, followup}
+## Same-pair (physically identical stimulus) analysis
+## Reviewer response: shows why 0 wasn't a meaningful option — even with identical 
+## stimuli, dissimilarity ratings depend systematically on SF and direction.
+
+library(dplyr); library(ggplot2); library(ggpubr); library(tidyr)
+library(lme4);  library(lmerTest)
+
+# ---- 1. Filter to physically identical pairs only -------------------------
+same_pair <- trialdata %>%
+  filter(circle1_SF == circle2_SF, circle1_ori == circle2_ori) %>%
+  mutate(SF = circle1_SF, Direction = circle1_ori)
+
+# Sanity check: should be 48 conditions
+same_pair %>% distinct(SF, Direction) %>% nrow()   # expect 48
+
+# Trials per condition / participants per condition
+same_pair %>%
+  group_by(SF, Direction) %>%
+  summarise(n_trials = n(),
+            n_pp     = n_distinct(participant), .groups = "drop") %>%
+  print(n = 48)
+
+# ---- 2. Aggregate: participant-mean first, then across participants -------
+within_pp <- same_pair %>%
+  group_by(participant, SF, Direction) %>%
+  summarise(pp_mean_diss = mean(dissimilarity, na.rm = TRUE), .groups = "drop")
+
+cond_stats <- within_pp %>%
+  group_by(SF, Direction) %>%
+  summarise(mean_diss = mean(pp_mean_diss, na.rm = TRUE),
+            sd_diss   = sd(pp_mean_diss,   na.rm = TRUE),
+            n_pp      = n(),
+            sem_diss  = sd_diss / sqrt(n_pp),
+            .groups   = "drop") %>%
+  mutate(SF_f = factor(SF), Dir_f = factor(Direction))
+
+write.csv(cond_stats, "samepair_48_condition_means.csv", row.names = FALSE)
+print(cond_stats, n = 48)
+
+# ---- Compute position-wise marginal means for overlay --------------------
+marg_by_SF <- cond_stats %>%
+  group_by(SF) %>%
+  summarise(avg_diss = mean(mean_diss),
+            avg_sem  = sd(mean_diss) / sqrt(n()),
+            .groups = "drop")
+
+marg_by_dir <- cond_stats %>%
+  group_by(Direction) %>%
+  summarise(avg_diss = mean(mean_diss),
+            avg_sem  = sd(mean_diss) / sqrt(n()),
+            .groups = "drop")
+
+# ---- 3. Plot ordered by SF (with average line) ----------------------------
+p_by_SF <- ggplot(cond_stats, aes(x = SF, y = mean_diss)) +
+  # individual direction lines (faded)
+  geom_line(aes(colour = Dir_f, group = Dir_f), alpha = 0.4) +
+  geom_point(aes(colour = Dir_f), size = 2, alpha = 0.6) +
+  geom_errorbar(aes(ymin = mean_diss - sem_diss,
+                    ymax = mean_diss + sem_diss,
+                    colour = Dir_f),
+                width = 0, alpha = 0.3) +
+  # marginal mean across directions (black, prominent)
+  geom_line(data = marg_by_SF, aes(x = SF, y = avg_diss),
+            colour = "black", linewidth = 1.5, inherit.aes = FALSE) +
+  geom_point(data = marg_by_SF, aes(x = SF, y = avg_diss),
+             colour = "black", size = 3.5, inherit.aes = FALSE) +
+  geom_errorbar(data = marg_by_SF,
+                aes(x = SF, ymin = avg_diss - avg_sem,
+                    ymax = avg_diss + avg_sem),
+                width = 0.05, colour = "black",
+                linewidth = 0.7, inherit.aes = FALSE) +
+  scale_x_log10(breaks = sort(unique(cond_stats$SF))) +
+  labs(x = "Spatial Frequency (cpd)",
+       y = "Same-pair mean dissimilarity",
+       colour = "Direction (°)") +
+  theme_pubr() + theme(legend.position = "right")
+ggsave("samepair_orderedby_SF.png", p_by_SF, width = 8, height = 6, dpi = 300)
+
+# ---- 4. Plot ordered by direction (with average line) ---------------------
+p_by_dir <- ggplot(cond_stats, aes(x = Direction, y = mean_diss)) +
+  # individual SF lines (faded)
+  geom_line(aes(colour = SF_f, group = SF_f), alpha = 0.4) +
+  geom_point(aes(colour = SF_f), size = 2, alpha = 0.6) +
+  geom_errorbar(aes(ymin = mean_diss - sem_diss,
+                    ymax = mean_diss + sem_diss,
+                    colour = SF_f),
+                width = 0, alpha = 0.3) +
+  # marginal mean across SFs (black, prominent)
+  geom_line(data = marg_by_dir, aes(x = Direction, y = avg_diss),
+            colour = "black", linewidth = 1.5, inherit.aes = FALSE) +
+  geom_point(data = marg_by_dir, aes(x = Direction, y = avg_diss),
+             colour = "black", size = 3.5, inherit.aes = FALSE) +
+  geom_errorbar(data = marg_by_dir,
+                aes(x = Direction, ymin = avg_diss - avg_sem,
+                    ymax = avg_diss + avg_sem),
+                width = 8, colour = "black",
+                linewidth = 0.7, inherit.aes = FALSE) +
+  scale_x_continuous(breaks = sort(unique(cond_stats$Direction))) +
+  labs(x = "Direction of motion (°)",
+       y = "Same-pair mean dissimilarity",
+       colour = "SF (cpd)") +
+  theme_pubr() + theme(legend.position = "right")
+ggsave("samepair_orderedby_direction.png", p_by_dir, width = 8, height = 6, dpi = 300)
+ggsave("samepair_orderedby_direction.png", p_by_dir, width = 8, height = 6, dpi = 300)
+
+# ---- 5. Heatmap: all 48 conditions in one view ----------------------------
+p_heat <- ggplot(cond_stats,
+                 aes(x = factor(Direction), y = factor(SF), fill = mean_diss)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(label = sprintf("%.2f", mean_diss)), size = 3.5) +
+  scale_fill_gradient(low = "white", high = "red", name = "Mean\ndissim.") +
+  labs(x = "Direction (°)", y = "Spatial Frequency (cpd)") +
+  theme_minimal() + theme(panel.grid = element_blank())
+ggsave("samepair_heatmap_48.png", p_heat, width = 9, height = 6, dpi = 300)
+
+# ---- 6. Marginal means (descriptive, NOT for stats) -----------------------
+cond_stats %>% group_by(SF)        %>%
+  summarise(marg = mean(mean_diss), .groups = "drop") %>% print()
+cond_stats %>% group_by(Direction) %>%
+  summarise(marg = mean(mean_diss), .groups = "drop") %>% print()
+
+# ---- 7. Statistical test: do SF and Direction systematically modulate -----
+##  same-pair dissimilarity? Use within-participant data for proper power.
+within_pp <- within_pp %>%
+  mutate(log2_SF = log2(SF), Dir_f = factor(Direction))
+
+m_null <- lmer(pp_mean_diss ~ 1                          + (1|participant),
+               data = within_pp, REML = FALSE)
+m_SF   <- lmer(pp_mean_diss ~ log2_SF                    + (1|participant),
+               data = within_pp, REML = FALSE)
+m_dir  <- lmer(pp_mean_diss ~ Dir_f                      + (1|participant),
+               data = within_pp, REML = FALSE)
+m_both <- lmer(pp_mean_diss ~ log2_SF + Dir_f            + (1|participant),
+               data = within_pp, REML = FALSE)
+m_int  <- lmer(pp_mean_diss ~ log2_SF * Dir_f            + (1|participant),
+               data = within_pp, REML = FALSE)
+
+cat("\n--- Effect of SF (log2) ---\n");        print(anova(m_null, m_SF))
+cat("\n--- Effect of Direction ---\n");        print(anova(m_null, m_dir))
+cat("\n--- SF + Direction vs SF only ---\n");  print(anova(m_SF,   m_both))
+cat("\n--- Interaction ---\n");                print(anova(m_both, m_int))
+cat("\n--- Best fitted model summary ---\n");  print(summary(m_both))
+```
+
 
 ## DISTRIBUTED Matrix Stats
 ```{r, human stats}
@@ -2443,6 +2586,70 @@ library(lmerTest)
 library(ggpubr)
 library(emmeans)
 
+###############################################################################
+# Shared model-family colour mapping (used in both human and mouse plots)
+###############################################################################
+
+# Family detection: classify a display name into a model family.
+# Order matters — Wake/Ane is checked first because some mouse models include
+# "WakeAne" together with another factor (e.g. "Direction + WakeAne"), and we
+# want the bar coloured by the additional discriminating factor, not WakeAne.
+# Wake/Ane on its own (or with SF) gets the WakeAne colour family.
+classify_model_family <- function(name) {
+  name_lc <- tolower(name)
+  if (grepl("category|categorical", name_lc))         return("Category")
+  if (grepl("direction|dirdiff",    name_lc))         return("Direction")
+  if (grepl("orientation|oridiff",  name_lc))         return("Orientation")
+  if (grepl("wakeane",              name_lc))         return("WakeAne")
+  if (grepl("^sf$|^abs_sf",         name_lc))         return("SF")
+  return("Null")
+}
+
+# AIC = lighter, BIC = darker
+family_colours <- list(
+  Null        = c(AIC = "#BDBDBD", BIC = "#525252"),  # light/dark grey
+  SF          = c(AIC = "#A8DDB5", BIC = "#2B8C3D"),  # light/dark green
+  WakeAne     = c(AIC = "#ff8b8b", BIC = "#e70000"),  # light/dark red
+  Direction   = c(AIC = "#FDBE85", BIC = "#D94801"),  # light/dark orange
+  Orientation = c(AIC = "#F4B3D2", BIC = "#C71585"),  # light/dark pink
+  Category    = c(AIC = "#9ECAE1", BIC = "#08519C")   # light/dark blue
+)
+
+# Build a fill-key per row in the AIC/BIC long data frame
+# Expects columns: Model, Metric, Value
+build_family_fill <- function(df_long) {
+  df_long$Family   <- vapply(as.character(df_long$Model), classify_model_family, character(1))
+  df_long$FillKey  <- paste(df_long$Family, df_long$Metric, sep = "_")
+  df_long
+}
+
+# Build the named vector of fill colours that ggplot will use
+build_fill_palette <- function() {
+  out <- c()
+  for (fam in names(family_colours)) {
+    out[paste0(fam, "_AIC")] <- family_colours[[fam]]["AIC"]
+    out[paste0(fam, "_BIC")] <- family_colours[[fam]]["BIC"]
+  }
+  out
+}
+
+# After build_fill_palette() — build matching pretty labels
+fill_labels <- c(
+  Null_AIC        = "Null (AIC)",
+  Null_BIC        = "Null (BIC)",
+  SF_AIC          = "SF (AIC)",
+  SF_BIC          = "SF (BIC)",
+  WakeAne_AIC     = "Wake/Ane (AIC)",
+  WakeAne_BIC     = "Wake/Ane (BIC)",
+  Direction_AIC   = "Direction (AIC)",
+  Direction_BIC   = "Direction (BIC)",
+  Orientation_AIC = "Orientation (AIC)",
+  Orientation_BIC = "Orientation (BIC)",
+  Category_AIC    = "Category (AIC)",
+  Category_BIC    = "Category (BIC)"
+)
+
+
 #############################
 # Step 1: Z-transform dissimilarity
 #############################
@@ -2499,17 +2706,17 @@ model_abs_SF_Diff                     <- lmer(z_dissimilarity ~ abs_SF_Diff + (1
 
 model_DirDiff                         <- lmer(z_dissimilarity ~ DirectionDiff + (1|participant), data = trialdata, REML = FALSE)
 model_DirDiff_abs_SF_Diff             <- lmer(z_dissimilarity ~ DirectionDiff + abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
-model_DirDiff_SF_Interaction          <- lmer(z_dissimilarity ~ DirectionDiff * abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
+model_DirDiff_SF_Interaction          <- lmer(z_dissimilarity ~ DirectionDiff + abs_SF_Diff + DirectionDiff * abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
 
 
 model_OrientationDiff                 <- lmer(z_dissimilarity ~ OrientationDiff + (1|participant), data = trialdata, REML = FALSE)
 model_OrientationDiff_abs_SF_Diff     <- lmer(z_dissimilarity ~ OrientationDiff + abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
-model_OrientationDiff_SF_Interaction  <- lmer(z_dissimilarity ~ OrientationDiff * abs_SF_Diff  + (1|participant), data = trialdata, REML = FALSE)
+model_OrientationDiff_SF_Interaction  <- lmer(z_dissimilarity ~ OrientationDiff + abs_SF_Diff + OrientationDiff * abs_SF_Diff  + (1|participant), data = trialdata, REML = FALSE)
 
 
 model_Categorical                     <- lmer(z_dissimilarity ~ Categorical + (1|participant), data = trialdata, REML = FALSE)
 model_Categorical_abs_SF_Diff         <- lmer(z_dissimilarity ~ Categorical + abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
-model_Categorical_SF_Interaction      <- lmer(z_dissimilarity ~ Categorical * abs_SF_Diff + (1|participant), data = trialdata, REML = FALSE)
+model_Categorical_SF_Interaction      <- lmer(z_dissimilarity ~ Categorical + abs_SF_Diff + (Categorical * abs_SF_Diff) + (1|participant), data = trialdata, REML = FALSE)
 
 
 #############################
@@ -2631,37 +2838,34 @@ aic_bic_long <- melt(
   value.name    = "Value"
 )
 
-# Define y-axis limits and ticks (adjust as needed)
-lower_limit <- min(aic_bic_long$Value) - 10
-upper_limit <- max(aic_bic_long$Value) + 10
-y_ticks     <- seq(lower_limit, upper_limit, by = (upper_limit - lower_limit) / 5)
+# Tag each row with family + metric and build the palette
+aic_bic_long <- build_family_fill(aic_bic_long)
+fill_palette <- build_fill_palette()
 
-p_aic_bic <- ggplot(aic_bic_long, aes(x = Model, y = Value, fill = Metric)) +
+p_aic_bic <- ggplot(aic_bic_long, aes(x = Model, y = Value, fill = FillKey)) +
   geom_col(position = position_dodge(width = 0.8), color = "black") +
-  scale_fill_manual(values = c("AIC" = "orange", "BIC" = "red")) +
+  scale_fill_manual(values = fill_palette, guide = "none") +
   theme_pubr() +
-  coord_flip(ylim = c(269000, 291000)) + 
-
-  labs(
-    x     = NULL,
-    y     = "Value"
-  ) +
+  coord_flip(ylim = c(270000, 291000)) +
+  labs(x = NULL, y = "Value") +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 20),  # Increase x-axis text size
-    axis.text.y = element_text(size = 24),                        # Increase y-axis text size
-    axis.title.y = element_text(size = 18),                        # Increase y-axis text size
-
+    plot.title   = element_text(hjust = 0.5, face = "plain", size = 20),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(size = 50, face = "plain"),
+    axis.text.x  = element_text(angle = 45, hjust = 1, size = 40, face = "plain"),
+    axis.ticks.length.x = unit(1, "cm"),
+    axis.text.y  = element_text(size = 35, face = "plain", colour = "black"),
+    axis.line    = element_line(size = 1.5),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid.minor = element_blank(),
     legend.position = "right",                                     # Keep legend position
     legend.text = element_text(size = 18),                         # Increase legend text size
     legend.title = element_text(size = 18),                        # Increase legend title size
-    plot.title = element_blank()                                    # Remove plot title
-  ) +
-  guides(
-    fill = guide_legend(keyheight = 2, keywidth = 2)  # Increase the size of the legend squares
   )
 
 print(p_aic_bic)
-ggsave("AIC_BIC_comparison_vs_control.png", plot = p_aic_bic, width = 20, height = 10, dpi = 300)
+ggsave("AIC_BIC_comparison_vs_control.png",
+       plot = p_aic_bic, width = 12, height = 10, dpi = 300)
 
 #############################
 # Step 7: Chi-square tests for each model
@@ -3533,7 +3737,1405 @@ if (num_positive_eigenvalues >= 3) {
 }
 
 ```
+## ______________For orientation-only trials_____________________
+## Orientation data loading
+```{r, ori load}
+## ========================================================================
+## Load Orientation-Only Data 
+## Mirrors the direction-data loader, but pulls from 'orientation_only_data'
+## and stores everything under *_ori names to avoid overwriting the
+## direction data already in the environment.
+## ========================================================================
 
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+
+## ---- 1. File listing ----
+
+ori_folder_path <- '/Users/gleim/Library/Mobile Documents/com~apple~CloudDocs/University/2023:24 Honours/Project Stats and R/Motion_analysis_KR/data/orientation_only_data'
+
+ori_all_files <- list.files(path = ori_folder_path, pattern = ".csv$")
+print(ori_all_files)
+
+ori_file_names <- list.files(path = ori_folder_path, pattern = "*.csv$", full.names = TRUE)
+
+## ---- 2. Read CSVs and stack ----
+
+columns_to_keep <- c("participant", "circle1_ori", "circle2_ori",
+                     "circle1_SF", "circle2_SF",
+                     "similarity", "date", "response_time")
+
+list_of_data_tables_ori <- list()
+
+for (file in ori_file_names) {
+  current_data <- fread(file, select = columns_to_keep)
+  list_of_data_tables_ori[[length(list_of_data_tables_ori) + 1]] <- current_data
+}
+
+data_ori        <- rbindlist(list_of_data_tables_ori, use.names = TRUE, fill = TRUE)
+pretimedata_ori <- rbindlist(list_of_data_tables_ori, use.names = TRUE, fill = TRUE)
+
+data_ori        <- na.omit(data_ori,
+                           cols = c("participant", "circle1_ori", "circle2_ori",
+                                    "circle1_SF", "circle2_SF",
+                                    "similarity", "response_time"))
+pretimedata_ori <- na.omit(data_ori,
+                           cols = c("participant", "date", "circle1_ori", "circle2_ori",
+                                    "circle1_SF", "circle2_SF",
+                                    "similarity", "response_time"))
+
+data_ori        <- dplyr::select(data_ori, -date)
+pretimedata_ori <- dplyr::select(pretimedata_ori, -similarity)
+
+print(data_ori)
+
+## NB: if your orientation experiment is not 150 trials x 2 passes,
+## change the 150 below to match it (e.g. 210, etc.)
+ori_trials_per_pass <- 150
+
+data_for_count_ori <- data_ori[, .SD[1:ori_trials_per_pass], by = participant][, !"similarity", with = FALSE]
+print(data_for_count_ori)
+
+str(data_for_count_ori)
+summary(data_for_count_ori)
+str(data_ori)
+summary(data_ori)
+
+## ---- 3. Rescale similarity to dissimilarity ----
+
+rescale <- function(data) {
+  if (!is.numeric(data$similarity)) {
+    data$similarity <- as.numeric(as.character(data$similarity))
+  }
+  data$similarity    <- data$similarity * -1
+  data$dissimilarity <- ifelse(data$similarity >= 1, data$similarity + 3, data$similarity + 4)
+  return(data)
+}
+
+data_ori <- rescale(data_ori)
+
+## ---- 4. Double-pass correlation + exclusion ----
+
+dp_cutoff_ori <- 0.1603   # same cutoff; change if your ori experiment has different n
+n_ori_trials  <- ori_trials_per_pass
+
+n.participants <- function(df) length(unique(df$participant))
+
+double.cor <- function(dissimilarity) {
+  expected_len <- 2 * ori_trials_per_pass
+  if (length(dissimilarity) != expected_len) {
+    cat("Warning: dissimilarity vector does not have", expected_len, "elements\n")
+  }
+  first_pass  <- dissimilarity[1:ori_trials_per_pass]
+  second_pass <- dissimilarity[(ori_trials_per_pass + 1):(2 * ori_trials_per_pass)]
+  if (sd(first_pass) == 0 | sd(second_pass) == 0) {
+    cat("Warning: one of the vectors is constant\n")
+    return(NA)
+  }
+  result <- cor(first_pass, second_pass, method = "spearman", use = "complete.obs")
+  if (is.na(result)) cat("NA correlation detected\n")
+  return(result)
+}
+
+double.cor.summary_ori <- data_ori %>%
+  group_by(participant) %>%
+  summarise(correlation = double.cor(dissimilarity))
+
+double.cor.acceptable_ori   <- filter(double.cor.summary_ori, correlation >= dp_cutoff_ori)
+double.cor.unacceptable_ori <- filter(double.cor.summary_ori, correlation <  dp_cutoff_ori)
+
+trialdata_ori <- filter(data_ori, participant %in% double.cor.acceptable_ori$participant)
+lowdpdata_ori <- filter(data_ori, participant %in% double.cor.unacceptable_ori$participant)
+
+## ---- 5. DP correlation plot ----
+
+plot_double_pass_correlation <- function(data, title, cutoff = NULL) {
+  p <- ggplot(data, aes(y = correlation, x = factor(1))) +
+    geom_violin(trim = TRUE, fill = "skyblue", color = "blue") +
+    geom_jitter(width = 0.1, size = 2.5) +
+    xlab(NULL) + ylab("Spearman's Correlation") +
+    scale_y_continuous(breaks = seq(0, 1, by = 0.1)) +
+    theme_pubr() +
+    theme(
+      plot.title       = element_text(hjust = 0.5, face = "plain", size = 20),
+      axis.title.x     = element_text(size = 35, face = "plain"),
+      axis.title.y     = element_text(size = 35, face = "plain",
+                                      margin = margin(t = 0, r = 20, b = 0, l = 0),
+                                      hjust = 0.65),
+      axis.text.x      = element_blank(),
+      axis.text.y      = element_text(size = 35, face = "plain", colour = "black"),
+      axis.line        = element_line(linewidth = 1.5),
+      panel.background = element_rect(fill = "white", colour = "white"),
+      panel.grid.major = element_line(color = "#d6d6d6"),
+      panel.grid.minor = element_blank()
+    )
+  if (!is.null(cutoff)) {
+    p <- p + geom_hline(yintercept = cutoff, linewidth = 1.5,
+                        colour = 'red', linetype = 'dashed') +
+      annotate("text", x = 1.4, y = cutoff - 0.07, size = 10,
+               label = paste("Cut-off:", cutoff), vjust = 0, colour = 'red')
+  }
+  return(p)
+}
+
+p_accept_ori <- plot_double_pass_correlation(double.cor.acceptable_ori,
+                                             "DP Correlation - Acceptable (Orientation)",
+                                             dp_cutoff_ori)
+ggsave("DP_Correlation_Acceptable_Data_Orientation.png", plot = p_accept_ori,
+       width = 10, height = 10, dpi = 300)
+
+p_all_ori <- plot_double_pass_correlation(double.cor.summary_ori,
+                                          "DP Correlation - All Data (Orientation)",
+                                          dp_cutoff_ori)
+ggsave("DP_Correlation_All_Data_Orientation.png", plot = p_all_ori,
+       width = 10, height = 10, dpi = 300)
+
+write.csv(trialdata_ori, "trialdata_orientation.csv", row.names = FALSE)
+write.csv(data_ori,      "data_orientation.csv",      row.names = FALSE)
+
+cat("Orientation-only Participants - All Data:",     n.participants(data_ori), "\n")
+cat("Orientation-only Participants - Acceptable:",   n.participants(double.cor.acceptable_ori), "\n")
+cat("Orientation-only Participants - Unacceptable:", n.participants(double.cor.unacceptable_ori), "\n")
+
+basic_stats_ori <- double.cor.acceptable_ori %>%
+  summarise(
+    mean     = mean(correlation,   na.rm = TRUE),
+    median   = median(correlation, na.rm = TRUE),
+    variance = var(correlation,    na.rm = TRUE),
+    sd       = sd(correlation,     na.rm = TRUE),
+    mad      = mad(correlation, constant = 1, na.rm = TRUE)
+  )
+print(basic_stats_ori)
+
+## ---- 6. Variance outlier check + final removal ----
+
+dissimilarity_stats_ori <- data_ori %>%
+  group_by(participant) %>%
+  summarise(
+    mean_dissimilarity     = mean(dissimilarity, na.rm = TRUE),
+    variance_dissimilarity = var(dissimilarity,  na.rm = TRUE)
+  ) %>%
+  filter(!is.na(mean_dissimilarity) & !is.na(variance_dissimilarity))
+
+mean_dis_mean_ori <- mean(dissimilarity_stats_ori$mean_dissimilarity,     na.rm = TRUE)
+mean_dis_sd_ori   <- sd(dissimilarity_stats_ori$mean_dissimilarity,       na.rm = TRUE)
+var_dis_mean_ori  <- mean(dissimilarity_stats_ori$variance_dissimilarity, na.rm = TRUE)
+var_dis_sd_ori    <- sd(dissimilarity_stats_ori$variance_dissimilarity,   na.rm = TRUE)
+
+dissimilarity_stats_ori <- dissimilarity_stats_ori %>%
+  mutate(
+    outlier_status = case_when(
+      (mean_dissimilarity     < mean_dis_mean_ori - 2 * mean_dis_sd_ori |
+       mean_dissimilarity     > mean_dis_mean_ori + 2 * mean_dis_sd_ori) &
+      (variance_dissimilarity < var_dis_mean_ori  - 2 * var_dis_sd_ori  |
+       variance_dissimilarity > var_dis_mean_ori  + 2 * var_dis_sd_ori)   ~ "Both Outliers",
+      mean_dissimilarity     < mean_dis_mean_ori - 2 * mean_dis_sd_ori |
+        mean_dissimilarity   > mean_dis_mean_ori + 2 * mean_dis_sd_ori   ~ "Mean Outlier",
+      variance_dissimilarity < var_dis_mean_ori  - 2 * var_dis_sd_ori  |
+        variance_dissimilarity > var_dis_mean_ori + 2 * var_dis_sd_ori   ~ "Variance Outlier",
+      TRUE                                                                ~ "None"
+    )
+  )
+
+variance_outliers_ori <- dissimilarity_stats_ori %>%
+  filter(outlier_status %in% c("Variance Outlier", "Both Outliers")) %>%
+  pull(participant)
+
+trialdata_ori <- trialdata_ori %>% filter(!participant %in% variance_outliers_ori)
+lowdpdata_ori <- bind_rows(lowdpdata_ori,
+                           data_ori %>% filter(participant %in% variance_outliers_ori))
+
+trialdata_participants_ori <- n.participants(trialdata_ori)
+cat("Orientation-only participants retained for analysis:", trialdata_participants_ori, "\n")
+
+## ---- 7. Swap ordering in trialdata_ori (per-participant second-pass reversal) ----
+
+trialdata_ori <- trialdata_ori %>%
+  group_by(participant) %>%
+  mutate(trial_rank = row_number()) %>%
+  ungroup() %>%
+  mutate(
+    tmp_SF      = circle1_SF,
+    tmp_ori     = circle1_ori,
+    circle1_SF  = ifelse(trial_rank > ori_trials_per_pass, circle2_SF,  circle1_SF),
+    circle1_ori = ifelse(trial_rank > ori_trials_per_pass, circle2_ori, circle1_ori),
+    circle2_SF  = ifelse(trial_rank > ori_trials_per_pass, tmp_SF,      circle2_SF),
+    circle2_ori = ifelse(trial_rank > ori_trials_per_pass, tmp_ori,     circle2_ori)
+  ) %>%
+  select(-tmp_SF, -tmp_ori, -trial_rank)
+```
+## Orientation matrices and diagonal offset
+```{r, ori matrices}
+## ========================================================================
+## Orientation-Only Matrices, MDS, Diagonal Offset
+## Mirrors the direction analysis but uses trialdata_ori and saves under
+## *_ori names. Produces dissimilarity_matrix_ori, sym_dissimilarity_matrix_ori
+## and the diagonal-offset plot at 48x48 resolution.
+## ========================================================================
+
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ggpubr)
+library(ggimage)
+library(reshape2)
+library(smacof)
+
+## ---- 1. Aggregate to SF x Ori ----
+
+trialdata_aggregated_ori <- trialdata_ori %>%
+  mutate(circle1_key = paste(circle1_SF, circle1_ori, sep = "_"),
+         circle2_key = paste(circle2_SF, circle2_ori, sep = "_")) %>%
+  group_by(circle1_key, circle2_key) %>%
+  summarize(mean_dissimilarity = mean(dissimilarity, na.rm = TRUE), .groups = 'drop') %>%
+  separate(circle1_key, into = c("circle1_SF", "circle1_ori"), sep = "_") %>%
+  separate(circle2_key, into = c("circle2_SF", "circle2_ori"), sep = "_") %>%
+  mutate(across(c(circle1_SF, circle2_SF, circle1_ori, circle2_ori), as.numeric)) %>%
+  arrange(circle1_SF, circle2_SF, circle1_ori, circle2_ori) %>%
+  mutate(circle1_key = paste(circle1_SF, circle1_ori, sep = "_"),
+         circle2_key = paste(circle2_SF, circle2_ori, sep = "_"))
+
+unique_keys_ori <- unique(c(trialdata_aggregated_ori$circle1_key,
+                            trialdata_aggregated_ori$circle2_key))
+key_index_ori   <- setNames(seq_along(unique_keys_ori), unique_keys_ori)
+
+trialdata_mapped_ori <- trialdata_aggregated_ori %>%
+  mutate(circle1_index = key_index_ori[circle1_key],
+         circle2_index = key_index_ori[circle2_key])
+
+## ---- 2. Axis breaks and labels (same logic as direction) ----
+
+spatial_freqs_ori     <- sort(unique(trialdata_ori$circle1_SF))
+num_spatial_freqs_ori <- length(spatial_freqs_ori)
+num_per_freq_ori      <- 48 / num_spatial_freqs_ori
+
+breaks_ori      <- seq(num_per_freq_ori / 2, 48, by = num_per_freq_ori)
+grid_breaks_ori <- seq(0.5, 48 + 0.5, by = num_per_freq_ori)
+labels_ori      <- as.character(spatial_freqs_ori)
+
+## ---- 3. Raw matrix ----
+
+dissimilarity_df_ori <- trialdata_mapped_ori %>%
+  dplyr::select(circle1_key, circle2_key, mean_dissimilarity) %>%
+  unique() %>%
+  spread(key = circle2_key, value = mean_dissimilarity)
+
+dissimilarity_matrix_ori <- as.matrix(dissimilarity_df_ori[-1])
+rownames(dissimilarity_matrix_ori) <- dissimilarity_df_ori$circle1_key
+
+sort_names <- function(names) {
+  parts    <- strsplit(names, "_")
+  parts_df <- do.call(rbind, lapply(parts, function(x) as.numeric(x)))
+  colnames(parts_df) <- c("SF", "Ori")
+  parts_df <- as.data.frame(parts_df)
+  ordered_df <- parts_df %>% arrange(SF, Ori)
+  paste(ordered_df$SF, ordered_df$Ori, sep = "_")
+}
+
+ordered_row_names_ori <- sort_names(rownames(dissimilarity_matrix_ori))
+ordered_col_names_ori <- sort_names(colnames(dissimilarity_matrix_ori))
+
+dissimilarity_matrix_ori <- dissimilarity_matrix_ori[ordered_row_names_ori, ordered_col_names_ori]
+
+write.csv(dissimilarity_matrix_ori, "raw_ori_dissimilarity_matrix.csv", row.names = TRUE)
+
+raw_df_ori <- as.data.frame(as.table(dissimilarity_matrix_ori))
+colnames(raw_df_ori) <- c("circle1_key", "circle2_key", "mean_dissimilarity")
+
+p_raw_SF_x_Ori_orientation <- ggplot(raw_df_ori, aes(x = circle1_key, y = circle2_key, fill = mean_dissimilarity)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "black", na.value = "red", name = "Dissimilarity",
+                      breaks = 0:7, labels = 0:7, limits = c(0, 7),
+                      guide = guide_colourbar(barwidth  = unit(0.4, "in") * 3,
+                                              barheight = unit(2.4, "in") * 3)) +
+  labs(x = "First Stimulus", y = "Second Stimulus",
+       title = sprintf("Orientation-only Dissimilarity by SF (n = %d)", trialdata_participants_ori)) +
+  theme_minimal() +
+  theme(
+    plot.title       = element_text(hjust = 0, size = 20),
+    axis.title.x     = element_text(size = 14),
+    axis.title.y     = element_text(size = 14),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    legend.title     = element_text(size = 16),
+    legend.text      = element_text(size = 16),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank()
+  ) +
+  coord_fixed(ratio = 1) +
+  geom_vline(xintercept = grid_breaks_ori, color = "white", linetype = "solid") +
+  geom_hline(yintercept = grid_breaks_ori, color = "white", linetype = "solid") +
+  scale_x_discrete(limits = ordered_row_names_ori) +
+  scale_y_discrete(limits = ordered_col_names_ori)
+
+ggsave("raw_distdata_SF_x_Ori_orientation.png",
+       plot = p_raw_SF_x_Ori_orientation, width = 10, height = 10, dpi = 300)
+print(p_raw_SF_x_Ori_orientation)
+
+## ---- 4. Raw matrix diagonal offsets ----
+
+mean_diag_dissimilarity <- function(matrix_in) {
+  max_dim <- dim(matrix_in)[1]
+  diag_stats <- lapply(0:(max_dim - 1), function(k) {
+    if (k == 0) {
+      diag_elements <- matrix_in[row(matrix_in) == col(matrix_in)]
+    } else {
+      diag_elements <- c(
+        matrix_in[row(matrix_in) == (col(matrix_in) - k)],
+        matrix_in[row(matrix_in) == (col(matrix_in) + k)]
+      )
+    }
+    data.frame(
+      Diagonal          = k,
+      MeanDissimilarity = mean(diag_elements, na.rm = TRUE),
+      SD                = sd(diag_elements,   na.rm = TRUE),
+      N                 = sum(!is.na(diag_elements))
+    )
+  })
+  do.call(rbind, diag_stats)
+}
+
+diagonals_df_ori <- mean_diag_dissimilarity(dissimilarity_matrix_ori)
+
+diagonals_df_ori$Group <- "Mixed"
+diagonals_df_ori$Group[seq(5, nrow(diagonals_df_ori), 8)] <- "Opposite"
+diagonals_df_ori$Group[seq(9, nrow(diagonals_df_ori), 8)] <- "Same"
+diagonals_df_ori$Group[1] <- "Same"
+
+subset_opp_ori   <- subset(diagonals_df_ori, Group == "Opposite")
+subset_same_ori  <- subset(diagonals_df_ori, Group == "Same")
+subset_mixed_ori <- subset(diagonals_df_ori, Group == "Mixed")
+
+coloured_ori <- ggplot(diagonals_df_ori, aes(x = Diagonal, y = MeanDissimilarity)) +
+  geom_point(aes(color = Group), size = 2) +
+  geom_errorbar(aes(color = Group,
+                    ymin = MeanDissimilarity - SD,
+                    ymax = MeanDissimilarity + SD), width = 0.2) +
+  geom_smooth(data = subset_opp_ori,   aes(color = Group), method = "lm", se = FALSE) +
+  geom_smooth(data = subset_same_ori,  aes(color = Group), method = "lm", se = FALSE) +
+  geom_smooth(data = subset_mixed_ori, aes(color = Group), method = "lm", se = FALSE) +
+  labs(title = "", x = "± Offset from Primary Diagonal", y = "Mean Dissimilarity") +
+  theme_pubr() +
+  theme(
+    plot.title       = element_text(hjust = 0.5, size = 20),
+    axis.title.x     = element_text(size = 45),
+    axis.title.y     = element_text(size = 50),
+    axis.text.x      = element_text(size = 40),
+    axis.text.y      = element_text(size = 40, colour = "black"),
+    axis.line        = element_line(size = 1.5),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid.minor = element_blank(),
+    legend.position  = "none"
+  ) +
+  scale_y_continuous(limits = c(0, 7), breaks = seq(0, 7, by = 1)) +
+  scale_x_continuous(breaks = sort(unique(c(seq(0, 40, by = 10), 48)))) +
+  scale_color_manual(values = c("Opposite" = "red", "Same" = "blue", "Mixed" = "purple"))
+
+ggsave("coloured_mean_dissimilarity_orientation.png",
+       plot = coloured_ori, width = 10, height = 10, dpi = 300)
+print(coloured_ori)
+
+## ---- 5. Symmetric matrix ----
+
+sym_dissimilarity_matrix_ori <- (dissimilarity_matrix_ori + t(dissimilarity_matrix_ori)) / 2
+rownames(sym_dissimilarity_matrix_ori) <- ordered_row_names_ori
+colnames(sym_dissimilarity_matrix_ori) <- ordered_row_names_ori
+
+write.csv(sym_dissimilarity_matrix_ori, "sym_dissimilarity_matrix_orientation.csv", row.names = TRUE)
+
+sym_df_ori <- as.data.frame(as.table(sym_dissimilarity_matrix_ori))
+colnames(sym_df_ori) <- c("circle1_key", "circle2_key", "mean_dissimilarity")
+
+p_sym_SF_x_Ori_orientation <- ggplot(sym_df_ori, aes(x = circle1_key, y = circle2_key, fill = mean_dissimilarity)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "black", na.value = "red", name = "Dissimilarity",
+                      breaks = 0:7, labels = 0:7, limits = c(0, 7),
+                      guide = guide_colourbar(barwidth  = unit(0.4, "in") * 3,
+                                              barheight = unit(2.4, "in") * 3)) +
+  labs(x = "First Stimulus", y = "Second Stimulus",
+       title = sprintf("Orientation-only symmetric matrix (n = %d)", trialdata_participants_ori)) +
+  theme_minimal() +
+  theme(
+    plot.title       = element_text(hjust = 0, size = 20),
+    axis.title.x     = element_text(size = 14),
+    axis.title.y     = element_text(size = 14),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    legend.title     = element_text(size = 16),
+    legend.text      = element_text(size = 16),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank()
+  ) +
+  coord_fixed(ratio = 1) +
+  geom_vline(xintercept = grid_breaks_ori, color = "white", linetype = "solid") +
+  geom_hline(yintercept = grid_breaks_ori, color = "white", linetype = "solid") +
+  scale_x_discrete(limits = ordered_row_names_ori) +
+  scale_y_discrete(limits = ordered_col_names_ori)
+
+ggsave("Sym_distdata_SF_x_Ori_orientation.png",
+       plot = p_sym_SF_x_Ori_orientation, width = 10, height = 10, dpi = 300)
+print(p_sym_SF_x_Ori_orientation)
+
+## ---- 6. MDS with icons ----
+
+diag(sym_dissimilarity_matrix_ori) <- 0
+dist_obj_ori <- as.dist(sym_dissimilarity_matrix_ori)
+mds_result_ori <- smacofSym(dist_obj_ori, ndim = 2)
+
+mds_df_ori <- as.data.frame(mds_result_ori$conf)
+names(mds_df_ori) <- c("Dimension 1", "Dimension 2")
+mds_df_ori$key        <- rownames(mds_df_ori)
+mds_df_ori$image_path <- paste0("Arrow_icons/", mds_df_ori$key, ".png")
+
+create_modified_plot_with_icons <- function(mds_df, title) {
+  ggplot(mds_df, aes(x = `Dimension 1`, y = `Dimension 2`)) +
+    geom_blank() +
+    coord_fixed() +
+    scale_x_continuous(breaks = c(-0.9, 0, 0.9), labels = c("-0.9", "0", "0.9"), limits = c(-0.9, 0.9)) +
+    scale_y_continuous(breaks = c(-0.9, 0, 0.9), labels = c("-0.9", "0", "0.9"), limits = c(-0.9, 0.9)) +
+    ggtitle(title) +
+    theme_pubr() +
+    theme(
+      axis.title.x = element_text(size = 40),
+      axis.text.x  = element_text(size = 40),
+      axis.title.y = element_text(size = 40),
+      axis.text.y  = element_text(size = 40),
+      axis.line    = element_line(size = 1.1),
+      legend.title = element_text(size = 14)
+    ) +
+    geom_image(aes(image = image_path), size = 0.08)
+}
+
+dist_MDS_plot_with_icons_ori <- create_modified_plot_with_icons(mds_df_ori, "")
+ggsave("mds_plot_with_icons_SF_x_Ori_orientation.png",
+       plot = dist_MDS_plot_with_icons_ori, width = 10, height = 10, dpi = 300)
+
+mds_result_for_eig_ori <- cmdscale(sym_dissimilarity_matrix_ori, k = 2, eig = TRUE)
+eigenvalues_ori        <- mds_result_for_eig_ori$eig
+num_positive_eig_ori   <- sum(eigenvalues_ori > 0)
+print(paste("Orientation: number of positive eigenvalues:", num_positive_eig_ori))
+
+if (num_positive_eig_ori >= 2) {
+  total_var_ori     <- sum(eigenvalues_ori[1:2])
+  total_var_pos_ori <- sum(eigenvalues_ori[eigenvalues_ori > 0])
+  prop_var_ori      <- total_var_ori / total_var_pos_ori
+  print(paste("Orientation: proportion of variance explained by 2D:", prop_var_ori))
+} else {
+  print("Orientation: less than 2 positive eigenvalues available.")
+}
+```
+
+## Orientation stats and difference
+```{r, oristats}
+## ========================================================================
+## Difference matrix and statistics: Orientation (static) − Direction (moving)
+## Plus the supervisor-requested difference-offset plot (variance preserved)
+## Requires:
+##   - sym_dissimilarity_matrix       (from direction analysis)
+##   - sym_dissimilarity_matrix_ori   (from orientation analysis)
+##   - diagonals_df                   (direction diagonal offset means + SDs)
+##   - diagonals_df_ori               (orientation diagonal offset means + SDs)
+## ========================================================================
+
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(ggpubr)
+
+## ---- 1. Sanity check: matrices must share row/col ordering ----
+
+stopifnot(identical(rownames(sym_dissimilarity_matrix),
+                    rownames(sym_dissimilarity_matrix_ori)))
+stopifnot(identical(colnames(sym_dissimilarity_matrix),
+                    colnames(sym_dissimilarity_matrix_ori)))
+
+## ---- 2. Difference matrix: orientation − direction ----
+
+difference_matrix <- dissimilarity_matrix_ori - dissimilarity_matrix
+rownames(difference_matrix) <- ordered_row_names_ori
+colnames(difference_matrix) <- ordered_row_names_ori
+
+
+diff_melted <- reshape2::melt(as.matrix(difference_matrix))
+colnames(diff_melted) <- c("Stim1", "Stim2", "Difference")
+
+diff_melted$circle1_index <- as.numeric(factor(diff_melted$Stim1, levels = colnames(difference_matrix)))
+diff_melted$circle2_index <- as.numeric(factor(diff_melted$Stim2, levels = colnames(difference_matrix)))
+
+max_abs <- max(abs(diff_melted$Difference), na.rm = TRUE)
+
+p_diff <- ggplot(diff_melted, aes(x = circle1_index, y = circle2_index, fill = Difference)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "red", mid = "white", high = "blue",
+                       midpoint = 0, limits = c(-max_abs, max_abs),
+                       na.value = "grey50", name = "Difference",
+                       guide = guide_colourbar(barwidth  = unit(0.4, "in") * 3,
+                                               barheight = unit(2.4, "in") * 3)) +
+  labs(x = "", y = "", title = "Orientation (static) − Direction (moving)") +
+  theme_minimal() +
+  theme(
+    plot.title       = element_text(hjust = 0, size = 20),
+    axis.title.x     = element_text(size = 14),
+    axis.title.y     = element_text(size = 14),
+    axis.text.x      = element_text(size = 12),
+    axis.text.y      = element_text(size = 12),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank()
+  ) +
+  coord_fixed(ratio = 1) +
+  geom_vline(xintercept = grid_breaks, color = "white", linetype = "solid") +
+  geom_hline(yintercept = grid_breaks, color = "white", linetype = "solid") +
+  scale_x_continuous(breaks = breaks, labels = labels, limits = c(0.5, 48.5)) +
+  scale_y_continuous(breaks = breaks, labels = labels, limits = c(0.5, 48.5))
+
+print(p_diff)
+ggsave("difference_matrix_plot.png", plot = p_diff, width = 12, height = 12, dpi = 300)
+
+## ---- 3. Whole-matrix correlations (upper triangle, off-diagonal) ----
+
+upper_idx <- upper.tri(dissimilarity_matrix_ori, diag = FALSE)
+vec_ori   <- dissimilarity_matrix_ori[upper_idx]
+vec_dir   <- dissimilarity_matrix[upper_idx]
+
+spearman_r <- cor(vec_ori, vec_dir, method = "spearman", use = "complete.obs")
+pearson_r  <- cor(vec_ori, vec_dir, method = "pearson",  use = "complete.obs")
+
+cat("\n======== Correlations (upper triangle, off-diagonal) ========\n")
+cat("Spearman rho:", round(spearman_r, 4), "\n")
+cat("Pearson r:   ", round(pearson_r,  4), "\n")
+
+## ---- 4. Cell-wise statistics by direction category ----
+## (Original analysis kept verbatim; only the source matrix has changed.)
+
+diff_melted_stats <- diff_melted %>%
+  mutate(
+    SF1  = as.numeric(sub("_.*", "", Stim1)),
+    Dir1 = as.numeric(sub(".*_", "", Stim1)),
+    SF2  = as.numeric(sub("_.*", "", Stim2)),
+    Dir2 = as.numeric(sub(".*_", "", Stim2))
+  )
+
+get_dir_diff <- function(d1, d2) {
+  diff <- abs(d1 - d2)
+  ifelse(diff > 180, 360 - diff, diff)
+}
+
+diff_melted_stats <- diff_melted_stats %>%
+  mutate(
+    DirDiff = mapply(get_dir_diff, Dir1, Dir2),
+    DirCategory = case_when(
+      DirDiff == 0   & SF1 == SF2 ~ "Diagonal",
+      DirDiff == 0   & SF1 != SF2 ~ "Same",
+      DirDiff == 180              ~ "Opposite",
+      DirDiff == 90               ~ "Orthogonal",
+      TRUE                        ~ "Other"
+    ),
+    SameSF = ifelse(SF1 == SF2, "Same SF", "Different SF")
+  )
+
+diff_off <- diff_melted_stats %>% filter(DirCategory != "Diagonal")
+
+cat("\n======== Descriptive statistics by direction category ========\n")
+desc <- diff_off %>%
+  group_by(DirCategory) %>%
+  summarise(
+    n      = n(),
+    mean   = mean(Difference,   na.rm = TRUE),
+    sd     = sd(Difference,     na.rm = TRUE),
+    median = median(Difference, na.rm = TRUE),
+    .groups = "drop"
+  )
+print(as.data.frame(desc))
+
+cat("\n======== One-sample tests (H0: mean = 0) ========\n")
+for (cat_name in c("Same", "Opposite", "Orthogonal", "Other")) {
+  vals <- diff_off %>% filter(DirCategory == cat_name) %>% pull(Difference)
+  tt <- t.test(vals, mu = 0)
+  wt <- wilcox.test(vals, mu = 0, conf.int = TRUE)
+  cat("\n---", cat_name, "---\n")
+  cat("  t-test:   t =", round(tt$statistic, 3),
+      ", p =", format.pval(tt$p.value, digits = 3),
+      ", mean =", round(tt$estimate, 3),
+      ", 95% CI [", round(tt$conf.int[1], 3), ",", round(tt$conf.int[2], 3), "]\n")
+  cat("  Wilcoxon: V =", wt$statistic,
+      ", p =", format.pval(wt$p.value, digits = 3),
+      ", pseudomedian =", round(wt$estimate, 3), "\n")
+}
+
+cat("\n======== Pairwise: Opposite vs each other category ========\n")
+opposite_vals <- diff_off %>% filter(DirCategory == "Opposite") %>% pull(Difference)
+for (cat_name in c("Same", "Orthogonal", "Other")) {
+  other_vals <- diff_off %>% filter(DirCategory == cat_name) %>% pull(Difference)
+  tt <- t.test(opposite_vals, other_vals)
+  wt <- wilcox.test(opposite_vals, other_vals, conf.int = TRUE)
+  cat("\n--- Opposite vs.", cat_name, "---\n")
+  cat("  t-test:   t =", round(tt$statistic, 3),
+      ", p =", format.pval(tt$p.value, digits = 3),
+      ", diff in means =", round(mean(opposite_vals) - mean(other_vals), 3), "\n")
+  cat("  Wilcoxon: W =", wt$statistic,
+      ", p =", format.pval(wt$p.value, digits = 3), "\n")
+}
+
+cat("\n======== Omnibus ANOVA: Difference ~ DirCategory ========\n")
+aov_result <- aov(Difference ~ DirCategory, data = diff_off)
+print(summary(aov_result))
+cat("\nTukey HSD post-hoc:\n")
+print(TukeyHSD(aov_result))
+
+cat("\n======== Kruskal-Wallis ========\n")
+print(kruskal.test(Difference ~ DirCategory, data = diff_off))
+
+cat("\n======== Opposite: Same SF vs Different SF ========\n")
+opp_same <- diff_off %>% filter(DirCategory == "Opposite", SameSF == "Same SF")      %>% pull(Difference)
+opp_diff <- diff_off %>% filter(DirCategory == "Opposite", SameSF == "Different SF") %>% pull(Difference)
+cat("Same SF:      mean =", round(mean(opp_same), 3), "±", round(sd(opp_same), 3), "(n =", length(opp_same), ")\n")
+cat("Different SF: mean =", round(mean(opp_diff), 3), "±", round(sd(opp_diff), 3), "(n =", length(opp_diff), ")\n")
+tt_opp <- t.test(opp_same, opp_diff)
+cat("t-test: t =", round(tt_opp$statistic, 3), ", p =", format.pval(tt_opp$p.value, digits = 3), "\n")
+
+cat("\n======== Effect size: Opposite vs Non-opposite ========\n")
+non_opp_vals <- diff_off %>% filter(DirCategory != "Opposite") %>% pull(Difference)
+pooled_sd <- sqrt(((length(opposite_vals) - 1) * var(opposite_vals) +
+                   (length(non_opp_vals) - 1) * var(non_opp_vals)) /
+                  (length(opposite_vals) + length(non_opp_vals) - 2))
+cohens_d <- (mean(opposite_vals) - mean(non_opp_vals)) / pooled_sd
+cat("Opposite mean:     ", round(mean(opposite_vals), 3), "\n")
+cat("Non-opposite mean: ", round(mean(non_opp_vals),  3), "\n")
+cat("Cohen's d:         ", round(cohens_d, 3), "\n")
+tt_all <- t.test(opposite_vals, non_opp_vals)
+cat("t-test: t =", round(tt_all$statistic, 3),
+    ", p =", format.pval(tt_all$p.value, digits = 3), "\n")
+
+## ===========================================================
+## 5. NEW: Difference-offset plot (variance-preserving option)
+## ===========================================================
+## For each diagonal offset, take the moving and static cells, subtract
+## per-cell, then summarise the resulting per-offset distribution. This
+## carries the per-cell variability into the difference rather than
+## throwing it away by subtracting two already-averaged points.
+
+diff_offset_stats <- function(mat_moving, mat_static) {
+  stopifnot(identical(dim(mat_moving), dim(mat_static)))
+  max_dim <- dim(mat_moving)[1]
+  do.call(rbind, lapply(0:(max_dim - 1), function(k) {
+    if (k == 0) {
+      mov_vals <- mat_moving[row(mat_moving) == col(mat_moving)]
+      sta_vals <- mat_static[row(mat_static) == col(mat_static)]
+    } else {
+      mov_vals <- c(
+        mat_moving[row(mat_moving) == (col(mat_moving) - k)],
+        mat_moving[row(mat_moving) == (col(mat_moving) + k)]
+      )
+      sta_vals <- c(
+        mat_static[row(mat_static) == (col(mat_static) - k)],
+        mat_static[row(mat_static) == (col(mat_static) + k)]
+      )
+    }
+    cell_diff <- sta_vals - mov_vals  # static − moving, matching difference_matrix
+    data.frame(
+      Diagonal      = k,
+      MeanDifference = mean(cell_diff, na.rm = TRUE),
+      SD             = sd(cell_diff,   na.rm = TRUE),
+      N              = sum(!is.na(cell_diff))
+    )
+  }))
+}
+
+diff_offset_df <- diff_offset_stats(sym_dissimilarity_matrix,
+                                    sym_dissimilarity_matrix_ori)
+
+## Group labels: same scheme used for the direction offset plot.
+diff_offset_df$Group <- "Mixed"
+diff_offset_df$Group[seq(5, nrow(diff_offset_df), 8)] <- "Opposite"
+diff_offset_df$Group[seq(9, nrow(diff_offset_df), 8)] <- "Same"
+diff_offset_df$Group[1] <- "Same"
+
+write.csv(diff_offset_df, "difference_offset_summary.csv", row.names = FALSE)
+
+subset_opp_diff   <- subset(diff_offset_df, Group == "Opposite")
+subset_same_diff  <- subset(diff_offset_df, Group == "Same")
+subset_mixed_diff <- subset(diff_offset_df, Group == "Mixed")
+
+p_diff_offset <- ggplot(diff_offset_df, aes(x = Diagonal, y = MeanDifference)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_errorbar(aes(color = Group,
+                    ymin = MeanDifference - SD,
+                    ymax = MeanDifference + SD), width = 0.2) +
+  geom_point(aes(color = Group), size = 2.5) +
+  geom_smooth(data = subset_opp_diff,   aes(color = Group), method = "lm", se = FALSE) +
+  geom_smooth(data = subset_same_diff,  aes(color = Group), method = "lm", se = FALSE) +
+  geom_smooth(data = subset_mixed_diff, aes(color = Group), method = "lm", se = FALSE) +
+  labs(x = "± Offset from Primary Diagonal",
+       y = "Mean Difference (Orientation − Direction)") +
+  theme_pubr() +
+  theme(
+    plot.title       = element_text(hjust = 0.5, size = 20),
+    axis.title.x     = element_text(size = 45),
+    axis.title.y     = element_text(size = 30),
+    axis.text.x      = element_text(size = 40),
+    axis.text.y      = element_text(size = 40, colour = "black"),
+    axis.line        = element_line(size = 1.5),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid.minor = element_blank(),
+    legend.position  = "none"
+  ) +
+  scale_x_continuous(breaks = sort(unique(c(seq(0, 40, by = 10), 48)))) +
+  scale_y_continuous(limits = c(-2, 2)) +
+
+  scale_color_manual(values = c("Opposite" = "red", "Same" = "blue", "Mixed" = "purple"))
+
+print(p_diff_offset)
+ggsave("difference_offset_plot.png", plot = p_diff_offset, width = 10, height = 10, dpi = 300)
+```
+
+## Ideal Model Matrices figures 
+```{r, ideal matrices}
+############################################################
+## IDEAL THEORETICAL MATRICES: Direction / Orientation / Category
+## Uses the same 8 directions x 6 SF layout and the same plotting style
+## as your original SF x Ori matrix code
+############################################################
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpubr)
+library(reshape2)
+library(patchwork)
+
+############################################################
+# 1. Define the stimulus layout exactly as in the original code
+############################################################
+
+# Pull the unique stimulus values from your data
+spatial_freqs <- sort(unique(c(trialdata$circle1_SF, trialdata$circle2_SF)))
+directions    <- sort(unique(c(trialdata$circle1_ori, trialdata$circle2_ori)))
+
+# Build the full ordered set of 48 stimuli: 6 SF x 8 directions
+stimulus_df <- expand.grid(
+  SF  = spatial_freqs,
+  Ori = directions
+) %>%
+  arrange(SF, Ori) %>%
+  mutate(key = paste(SF, Ori, sep = "_"))
+
+all_keys <- stimulus_df$key
+
+# Number of directions per SF block (should be 8)
+num_combinations_per_frequency <- length(directions)
+
+# Breaks for white grid lines between SF blocks
+grid_breaks <- seq(0.5, length(all_keys) + 0.5, by = num_combinations_per_frequency)
+
+############################################################
+# 2. Build all pairwise combinations and compute model terms
+############################################################
+
+theoretical_df <- expand.grid(
+  circle1_key = all_keys,
+  circle2_key = all_keys,
+  stringsAsFactors = FALSE
+) %>%
+  separate(circle1_key, into = c("circle1_SF", "circle1_ori"), sep = "_", remove = FALSE) %>%
+  separate(circle2_key, into = c("circle2_SF", "circle2_ori"), sep = "_", remove = FALSE) %>%
+  mutate(
+    circle1_SF  = as.numeric(circle1_SF),
+    circle2_SF  = as.numeric(circle2_SF),
+    circle1_ori = as.numeric(circle1_ori),
+    circle2_ori = as.numeric(circle2_ori)
+  ) %>%
+  mutate(
+    ########################################################
+    # Direction difference: linear circular difference, 0-180
+    ########################################################
+    DirectionDiff = abs(circle1_ori - circle2_ori),
+    DirectionDiff = ifelse(DirectionDiff > 180, 360 - DirectionDiff, DirectionDiff),
+
+    ########################################################
+    # Orientation difference: linear collapsed difference, 0-90
+    ########################################################
+    OrientationDiff = abs(circle1_ori - circle2_ori),
+    OrientationDiff = ifelse(OrientationDiff > 180, 360 - OrientationDiff, OrientationDiff),
+    OrientationDiff = ifelse(OrientationDiff > 90, 180 - OrientationDiff, OrientationDiff),
+
+    ########################################################
+    # Categorical class exactly as in your LME code
+    ########################################################
+    Categorical = factor(
+      ifelse(DirectionDiff == 0,   "Same",
+      ifelse(DirectionDiff == 180, "Opposite",
+      ifelse(DirectionDiff == 90,  "90", "Other"))),
+      levels = c("Same", "Opposite", "90", "Other")
+    ),
+
+    ########################################################
+    # Spatial-frequency difference: linear on log2 scale
+    ########################################################
+    abs_SF_Diff_num = abs(log2(circle1_SF) - log2(circle2_SF))
+  )
+
+############################################################
+# 3. Define explicit, non-softened model values
+############################################################
+
+# Scale SF difference onto 0-7
+max_sf_diff <- max(theoretical_df$abs_SF_Diff_num, na.rm = TRUE)
+
+theoretical_df <- theoretical_df %>%
+  mutate(
+    SFModel = 7 * abs_SF_Diff_num / max_sf_diff
+  )
+
+############################################################
+# Direction model:
+# 0 deg -> 0, 180 deg -> 7, linear in between
+############################################################
+
+theoretical_df <- theoretical_df %>%
+  mutate(
+    DirectionOnly = 7 * DirectionDiff / 180
+  )
+
+############################################################
+# Orientation model:
+# 0 deg -> 0, 90 deg -> 7, linear in between
+############################################################
+
+theoretical_df <- theoretical_df %>%
+  mutate(
+    OrientationOnly = 7 * OrientationDiff / 90
+  )
+
+############################################################
+# Categorical model:
+# explicit discrete class levels only
+#
+# NOTE:
+# this is not a continuous angular model.
+# it simply assigns one display level per category:
+# Same < Opposite < 90 < Other
+#
+# These are ordinal category levels scaled to 0-7.
+############################################################
+
+theoretical_df <- theoretical_df %>%
+  mutate(
+    CategoryCode = case_when(
+      Categorical == "Same"     ~ 0,
+      Categorical == "Opposite" ~ 1,
+      Categorical == "90"       ~ 2,
+      Categorical == "Other"    ~ 3
+    ),
+    CategoryOnly = 7 * CategoryCode / 3
+  )
+
+############################################################
+# Final model matrices:
+# simple equal-weight average of structure and SF
+############################################################
+
+theoretical_df <- theoretical_df %>%
+  mutate(
+    DirectionModel   = (DirectionOnly + SFModel) / 2,
+    OrientationModel = (OrientationOnly + SFModel) / 2,
+    CategoricalModel = (CategoryOnly + SFModel) / 2
+  )
+
+############################################################
+# Optional checks
+############################################################
+
+cat("\n====================================================\n")
+cat("CHECKING MODEL VALUE RANGES\n")
+cat("====================================================\n")
+cat("DirectionDiff values:\n")
+print(sort(unique(theoretical_df$DirectionDiff)))
+
+cat("\nOrientationDiff values:\n")
+print(sort(unique(theoretical_df$OrientationDiff)))
+
+cat("\nCategorical levels:\n")
+print(table(theoretical_df$Categorical))
+
+cat("\nSF difference values:\n")
+print(sort(unique(theoretical_df$abs_SF_Diff_num)))
+
+cat("\nRanges of final model values:\n")
+print(range(theoretical_df$DirectionModel, na.rm = TRUE))
+print(range(theoretical_df$OrientationModel, na.rm = TRUE))
+print(range(theoretical_df$CategoricalModel, na.rm = TRUE))
+############################################################
+# 4. Helper to convert a long table into a square matrix
+############################################################
+
+make_matrix <- function(df, value_col, ordered_keys) {
+  mat <- matrix(
+    NA_real_,
+    nrow = length(ordered_keys),
+    ncol = length(ordered_keys),
+    dimnames = list(ordered_keys, ordered_keys)
+  )
+  
+  row_idx <- match(df$circle1_key, ordered_keys)
+  col_idx <- match(df$circle2_key, ordered_keys)
+  
+  mat[cbind(row_idx, col_idx)] <- df[[value_col]]
+  return(mat)
+}
+
+direction_matrix   <- make_matrix(theoretical_df, "DirectionModel",   all_keys)
+orientation_matrix <- make_matrix(theoretical_df, "OrientationModel", all_keys)
+category_matrix    <- make_matrix(theoretical_df, "CategoricalModel", all_keys)
+
+# Save the ideal matrices
+write.csv(direction_matrix,   "ideal_direction_matrix.csv",   row.names = TRUE)
+write.csv(orientation_matrix, "ideal_orientation_matrix.csv", row.names = TRUE)
+write.csv(category_matrix,    "ideal_categorical_matrix.csv", row.names = TRUE)
+
+############################################################
+# 5. Convert matrices to long format for plotting
+############################################################
+
+direction_df_plot <- as.data.frame(as.table(direction_matrix))
+colnames(direction_df_plot) <- c("circle1_key", "circle2_key", "mean_dissimilarity")
+
+orientation_df_plot <- as.data.frame(as.table(orientation_matrix))
+colnames(orientation_df_plot) <- c("circle1_key", "circle2_key", "mean_dissimilarity")
+
+category_df_plot <- as.data.frame(as.table(category_matrix))
+colnames(category_df_plot) <- c("circle1_key", "circle2_key", "mean_dissimilarity")
+
+############################################################
+# 6. Plot helper using the same style as your original code
+############################################################
+
+plot_ideal_matrix <- function(plot_df, plot_title) {
+  ggplot(plot_df, aes(x = circle1_key, y = circle2_key, fill = mean_dissimilarity)) +
+    geom_tile() +
+    scale_fill_gradient(
+      low = "white",
+      high = "black",
+      na.value = "red",
+      name = "Dissimilarity",
+      breaks = 0:7,
+      labels = 0:7,
+      limits = c(0, 7),
+      guide = guide_colourbar(
+        barwidth  = unit(0.4, "in") * 3,
+        barheight = unit(2.4, "in") * 3
+      )
+    ) +
+    labs(
+      x = "First Stimulus",
+      y = "Second Stimulus",
+      title = plot_title
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0, face = "plain", size = 20),
+      axis.title.x = element_text(size = 14, face = "plain"),
+      axis.title.y = element_text(size = 14, face = "plain"),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.title = element_text(size = 16),
+      legend.text = element_text(size = 16),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_blank()
+    ) +
+    coord_fixed(ratio = 1) +
+    geom_vline(xintercept = grid_breaks, color = "white", linetype = "solid") +
+    geom_hline(yintercept = grid_breaks, color = "white", linetype = "solid") +
+    scale_x_discrete(limits = all_keys) +
+    scale_y_discrete(limits = all_keys)
+}
+
+############################################################
+# 7. Make the three plots
+############################################################
+
+p_direction_ideal   <- plot_ideal_matrix(direction_df_plot,   "Ideal direction model")
+p_orientation_ideal <- plot_ideal_matrix(orientation_df_plot, "Ideal orientation model")
+p_category_ideal    <- plot_ideal_matrix(category_df_plot,    "Ideal categorical model")
+
+# Print individual plots if wanted
+print(p_direction_ideal)
+print(p_orientation_ideal)
+print(p_category_ideal)
+
+# Save individual plots
+ggsave("ideal_direction_matrix.png",   plot = p_direction_ideal,   width = 10, height = 10, dpi = 300)
+ggsave("ideal_orientation_matrix.png", plot = p_orientation_ideal, width = 10, height = 10, dpi = 300)
+ggsave("ideal_categorical_matrix.png", plot = p_category_ideal,    width = 10, height = 10, dpi = 300)
+
+############################################################
+# 8. Combine side by side
+############################################################
+
+combined_ideal_plot <- (p_direction_ideal + p_orientation_ideal + p_category_ideal) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "right")
+
+print(combined_ideal_plot)
+
+ggsave(
+  "ideal_model_matrices_side_by_side.png",
+  plot = combined_ideal_plot,
+  width = 30,
+  height = 10,
+  dpi = 300
+)
+
+
+############################################################
+## DIAGONAL OFFSET PLOTS FOR IDEAL MATRICES
+## Paste this after creating:
+## direction_matrix, orientation_matrix, category_matrix
+############################################################
+
+library(ggplot2)
+library(ggpubr)
+library(patchwork)
+
+############################################################
+# Function to calculate mean and SD for each diagonal (offset)
+############################################################
+
+mean_diag_dissimilarity <- function(matrix) {
+  max_dim <- dim(matrix)[1]  # assuming the matrix is square
+  
+  diag_stats <- lapply(0:(max_dim - 1), function(k) {
+    if (k == 0) {
+      # Main diagonal
+      diag_elements <- matrix[row(matrix) == col(matrix)]
+    } else {
+      # Combine both upper and lower diagonals for offset k
+      diag_elements <- c(
+        matrix[row(matrix) == (col(matrix) - k)],
+        matrix[row(matrix) == (col(matrix) + k)]
+      )
+    }
+    data.frame(
+      Diagonal = k,
+      MeanDissimilarity = mean(diag_elements, na.rm = TRUE),
+      SD = sd(diag_elements, na.rm = TRUE)
+    )
+  })
+  
+  diag_stats_df <- do.call(rbind, diag_stats)
+  return(diag_stats_df)
+}
+
+############################################################
+# Function to make the diagonal plot in your original style
+############################################################
+
+make_diagonal_plot <- function(input_matrix, plot_title = "") {
+  
+  diagonals_df <- mean_diag_dissimilarity(input_matrix)
+  
+  # Assign groups based on diagonal offset
+  diagonals_df$Group <- "Mixed"
+  diagonals_df$Group[seq(5, nrow(diagonals_df), 8)] <- "Opposite"
+  diagonals_df$Group[seq(9, nrow(diagonals_df), 8)] <- "Same"
+  
+  # Force the first row (offset = 0) to be "Same"
+  diagonals_df$Group[1] <- "Same"
+  
+  # Create subsets for each group to draw separate trend lines
+  subset_mixed <- subset(diagonals_df, Group == 'Mixed')
+  subset_opp   <- subset(diagonals_df, Group == 'Opposite')
+  subset_same  <- subset(diagonals_df, Group == 'Same')
+  
+  # Fit linear regression models for each group
+  model1 <- lm(MeanDissimilarity ~ Diagonal, data = subset_opp)
+  model2 <- lm(MeanDissimilarity ~ Diagonal, data = subset_same)
+  model3 <- lm(MeanDissimilarity ~ Diagonal, data = subset_mixed)
+  
+  # Print model summaries
+  print(paste("Summary for", plot_title, "- Opposite group:"))
+  print(summary(model1))
+  print(paste("Summary for", plot_title, "- Same group:"))
+  print(summary(model2))
+  print(paste("Summary for", plot_title, "- Mixed group:"))
+  print(summary(model3))
+  
+  # Perform ANOVA across groups
+  anova_model <- aov(MeanDissimilarity ~ Group, data = diagonals_df)
+  print(paste("ANOVA Summary for", plot_title))
+  print(summary(anova_model))
+  
+  # Tukey's HSD test for multiple comparisons
+  tukey_test <- TukeyHSD(anova_model)
+  print(paste("Tukey HSD Results for", plot_title))
+  print(tukey_test)
+  
+  # Extract and print p-values
+  tukey_p_values <- tukey_test$Group[, "p adj"]
+  names(tukey_p_values) <- rownames(tukey_test$Group)
+  print(tukey_p_values)
+  
+  # Create the scatter plot with error bars and trend lines
+  coloured <- ggplot(diagonals_df, aes(x = Diagonal, y = MeanDissimilarity)) +
+    geom_point(aes(color = Group), size = 2) +
+    geom_errorbar(aes(color = Group, ymin = MeanDissimilarity - SD, ymax = MeanDissimilarity + SD), width = 0.2) +
+    geom_smooth(data = subset_opp, aes(color = Group), method = "lm", se = FALSE) +
+    geom_smooth(data = subset_same, aes(color = Group), method = "lm", se = FALSE) +
+    geom_smooth(data = subset_mixed, aes(color = Group), method = "lm", se = FALSE) +
+    labs(title = plot_title,
+         x = "± Offset from Primary Diagonal",
+         y = "Mean Dissimilarity") +
+    theme_pubr() +
+    theme(
+      plot.title   = element_text(hjust = 0.5, face = "plain", size = 20),
+      axis.title.x = element_text(size = 45, face = "plain"),
+      axis.title.y = element_text(size = 50, face = "plain"),
+      axis.text.x  = element_text(size = 40, face = "plain"),
+      axis.text.y  = element_text(size = 40, face = "plain", colour = "black"),
+      axis.line    = element_line(size = 1.5),
+      panel.background = element_rect(fill = "white", colour = "white"),
+      panel.grid.minor = element_blank(),
+      legend.position  = "none"
+    ) +
+    scale_y_continuous(limits = c(0, 7), breaks = seq(0, 7, by = 1)) +
+    scale_x_continuous(breaks = sort(unique(c(seq(0, 40, by = 10), 48)))) +
+    scale_color_manual(values = c("Opposite" = "red", "Same" = "blue", "Mixed" = "purple"))
+  
+  return(list(plot = coloured, data = diagonals_df))
+}
+
+############################################################
+# Generate the three diagonal plots
+############################################################
+
+direction_diag_out   <- make_diagonal_plot(direction_matrix,   "Ideal direction model")
+orientation_diag_out <- make_diagonal_plot(orientation_matrix, "Ideal orientation model")
+category_diag_out    <- make_diagonal_plot(category_matrix,    "Ideal categorical model")
+
+p_direction_diag   <- direction_diag_out$plot
+p_orientation_diag <- orientation_diag_out$plot
+p_category_diag    <- category_diag_out$plot
+
+############################################################
+# Print plots
+############################################################
+
+print(p_direction_diag)
+print(p_orientation_diag)
+print(p_category_diag)
+
+############################################################
+# Save plots
+############################################################
+
+ggsave("ideal_direction_diagonal_plot.png",   plot = p_direction_diag,   width = 10, height = 10, dpi = 300)
+ggsave("ideal_orientation_diagonal_plot.png", plot = p_orientation_diag, width = 10, height = 10, dpi = 300)
+ggsave("ideal_categorical_diagonal_plot.png", plot = p_category_diag,    width = 10, height = 10, dpi = 300)
+
+############################################################
+# Save diagonal summary tables
+############################################################
+
+write.csv(direction_diag_out$data,   "ideal_direction_diagonals.csv",   row.names = FALSE)
+write.csv(orientation_diag_out$data, "ideal_orientation_diagonals.csv", row.names = FALSE)
+write.csv(category_diag_out$data,    "ideal_categorical_diagonals.csv", row.names = FALSE)
+
+############################################################
+# Optional combined figure
+############################################################
+
+combined_diag_plot <- (p_direction_diag + p_orientation_diag + p_category_diag)
+
+print(combined_diag_plot)
+
+ggsave(
+  "ideal_model_diagonal_plots_side_by_side.png",
+  plot = combined_diag_plot,
+  width = 30,
+  height = 10,
+  dpi = 300
+)
+
+############################################################
+## TEACHING PANELS: 8x8 single-SF versions of each ideal model
+## Strips out spatial-frequency variation so the matrix shows
+## direction structure only. Intended for Fig. 2 to prime
+## readers on how to read the diagonal-offset format.
+##
+## Reuses from the chunks above:
+##   theoretical_df, spatial_freqs, directions,
+##   make_matrix(), mean_diag_dissimilarity()
+############################################################
+
+# Pick one spatial-frequency block (middle one)
+single_sf <- spatial_freqs[ceiling(length(spatial_freqs) / 2)]
+
+# 8 keys for this single-SF block
+single_stimulus_df <- data.frame(
+  SF  = single_sf,
+  Ori = directions
+) %>%
+  mutate(key = paste(SF, Ori, sep = "_"))
+
+single_keys <- single_stimulus_df$key
+
+# Filter pairwise table to within-this-SF pairs only.
+# Use the *_Only columns because SF is fixed (no SF gradient
+# to average in).
+single_theoretical_df <- theoretical_df %>%
+  filter(circle1_SF == single_sf, circle2_SF == single_sf) %>%
+  mutate(
+    DirectionModel_8x8   = DirectionOnly,
+    OrientationModel_8x8 = OrientationOnly,
+    CategoricalModel_8x8 = CategoryOnly
+  )
+
+# Build the three 8x8 matrices
+direction_matrix_8x8   <- make_matrix(single_theoretical_df, "DirectionModel_8x8",   single_keys)
+orientation_matrix_8x8 <- make_matrix(single_theoretical_df, "OrientationModel_8x8", single_keys)
+category_matrix_8x8    <- make_matrix(single_theoretical_df, "CategoricalModel_8x8", single_keys)
+
+############################################################
+# 8x8 matrix plotting helper.
+# Same visual style as plot_ideal_matrix, but no internal
+# white grid lines (only one SF block) and uses single_keys.
+############################################################
+
+plot_ideal_matrix_8x8 <- function(input_matrix, plot_title) {
+  plot_df <- as.data.frame(as.table(input_matrix))
+  colnames(plot_df) <- c("circle1_key", "circle2_key", "mean_dissimilarity")
+
+  ggplot(plot_df, aes(x = circle1_key, y = circle2_key, fill = mean_dissimilarity)) +
+    geom_tile() +
+    scale_fill_gradient(
+      low = "white",
+      high = "black",
+      na.value = "red",
+      name = "Dissimilarity",
+      breaks = 0:7,
+      labels = 0:7,
+      limits = c(0, 7),
+      guide = guide_colourbar(
+        barwidth  = unit(0.4, "in") * 3,
+        barheight = unit(2.4, "in") * 3
+      )
+    ) +
+    labs(
+      x = "First Stimulus",
+      y = "Second Stimulus",
+      title = plot_title
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0, face = "plain", size = 20),
+      axis.title.x = element_text(size = 14, face = "plain"),
+      axis.title.y = element_text(size = 14, face = "plain"),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.title = element_text(size = 16),
+      legend.text = element_text(size = 16),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_blank()
+    ) +
+    coord_fixed(ratio = 1) +
+    scale_x_discrete(limits = single_keys) +
+    scale_y_discrete(limits = single_keys)
+}
+
+p_direction_ideal_8x8   <- plot_ideal_matrix_8x8(direction_matrix_8x8,   "Direction (one SF block)")
+p_orientation_ideal_8x8 <- plot_ideal_matrix_8x8(orientation_matrix_8x8, "Orientation (one SF block)")
+p_category_ideal_8x8    <- plot_ideal_matrix_8x8(category_matrix_8x8,    "Category (one SF block)")
+
+print(p_direction_ideal_8x8)
+print(p_orientation_ideal_8x8)
+print(p_category_ideal_8x8)
+
+ggsave("ideal_direction_matrix_8x8.png",   plot = p_direction_ideal_8x8,   width = 8, height = 8, dpi = 300)
+ggsave("ideal_orientation_matrix_8x8.png", plot = p_orientation_ideal_8x8, width = 8, height = 8, dpi = 300)
+ggsave("ideal_categorical_matrix_8x8.png", plot = p_category_ideal_8x8,    width = 8, height = 8, dpi = 300)
+
+############################################################
+# Diagonal offset plots for 8x8 matrices.
+# Offsets 0-7. Same = offset 0, Opposite = offset 4, all
+# others = Mixed. No regression lines (Same/Opposite have a
+# single point each).
+############################################################
+
+make_diagonal_plot_8x8 <- function(input_matrix, plot_title = "") {
+
+  diagonals_df <- mean_diag_dissimilarity(input_matrix)
+
+  diagonals_df$Group <- "Mixed"
+  diagonals_df$Group[diagonals_df$Diagonal == 0] <- "Same"
+  diagonals_df$Group[diagonals_df$Diagonal == 4] <- "Opposite"
+
+  ggplot(diagonals_df, aes(x = Diagonal, y = MeanDissimilarity)) +
+    geom_errorbar(
+      aes(color = Group,
+          ymin = MeanDissimilarity - SD,
+          ymax = MeanDissimilarity + SD),
+      width = 0.2
+    ) +
+    geom_line(linetype = "dashed", linewidth = 2, color = "black") +
+    geom_point(aes(color = Group), size = 8) +
+    labs(
+      title = plot_title,
+      x = "± Offset from Primary Diagonal",
+      y = "Mean Dissimilarity"
+    ) +
+    theme_pubr() +
+    theme(
+      plot.title   = element_text(hjust = 0.5, face = "plain", size = 20),
+      axis.title.x = element_text(size = 25, face = "plain"),
+      axis.title.y = element_text(size = 25, face = "plain"),
+      axis.text.x  = element_text(size = 20, face = "plain"),
+      axis.text.y  = element_text(size = 20, face = "plain", colour = "black"),
+      axis.line    = element_line(size = 1.5),
+      panel.background = element_rect(fill = "white", colour = "white"),
+      panel.grid.minor = element_blank(),
+      legend.position  = "none"
+    ) +
+    scale_y_continuous(limits = c(0, 7), breaks = seq(0, 7, by = 1)) +
+    scale_x_continuous(breaks = 0:7) +
+    scale_color_manual(values = c("Opposite" = "red", "Same" = "blue", "Mixed" = "purple"))
+}
+
+p_direction_diag_8x8   <- make_diagonal_plot_8x8(direction_matrix_8x8,   "Direction (one SF block)")
+p_orientation_diag_8x8 <- make_diagonal_plot_8x8(orientation_matrix_8x8, "Orientation (one SF block)")
+p_category_diag_8x8    <- make_diagonal_plot_8x8(category_matrix_8x8,    "Category (one SF block)")
+
+print(p_direction_diag_8x8)
+print(p_orientation_diag_8x8)
+print(p_category_diag_8x8)
+
+ggsave("ideal_direction_diagonal_8x8.png",   plot = p_direction_diag_8x8,   width = 6, height = 6, dpi = 300)
+ggsave("ideal_orientation_diagonal_8x8.png", plot = p_orientation_diag_8x8, width = 6, height = 6, dpi = 300)
+ggsave("ideal_categorical_diagonal_8x8.png", plot = p_category_diag_8x8,    width = 6, height = 6, dpi = 300)
+
+############################################################
+# Combined teaching layout: matrix + diagonal plot, one row
+# per model. Direction and orientation only by default.
+# To include categorical, add the third row to the patchwork.
+############################################################
+
+combined_teaching_plot <- (
+  (p_direction_ideal_8x8   | p_direction_diag_8x8) /
+  (p_orientation_ideal_8x8 | p_orientation_diag_8x8)
+)
+
+print(combined_teaching_plot)
+
+ggsave(
+  "ideal_teaching_panels_8x8.png",
+  plot = combined_teaching_plot,
+  width = 16,
+  height = 16,
+  dpi = 300
+)
+
+```
 ## ______________For processing all mouse data_____________
 ## Dist matrix for all mice averaged across trials and time
 ```{r, all mice}
@@ -3668,6 +5270,87 @@ for (mouse_id in mice_ids) {
 
 cat("Processing complete.\n")
 
+# ---- Compute raw distance ranges for each mouse (off-diagonal values only) ----
+
+range_results <- data.frame(
+  Mouse = integer(),
+  Condition = character(),
+  DataType = character(),
+  NumNeurons = integer(),
+  Min_Distance = numeric(),
+  Max_Distance = numeric(),
+  Mean_Distance = numeric(),
+  SD_Distance = numeric(),
+  stringsAsFactors = FALSE
+)
+
+for (mouse_id in mice_ids) {
+  for (condition in names(conditions)) {
+    for (data_type in data_types) {
+      
+      var_name <- paste0("Mouse", mouse_id, "_", tolower(condition), "_", data_type, "_distmatrix")
+      
+      if (exists(var_name, envir = .GlobalEnv)) {
+        dm <- get(var_name, envir = .GlobalEnv)
+        
+        # Extract off-diagonal values (upper triangle, excluding diagonal)
+        off_diag <- dm[upper.tri(dm, diag = FALSE)]
+        
+        # Also read neuron count from original file
+        pattern <- paste0("^Mouse", mouse_id, "_", conditions[condition], "_", data_type, "_all_responses\\.csv$")
+        files <- list.files(path = file.path(base_dir, condition), pattern = pattern, full.names = TRUE)
+        if (length(files) == 1) {
+          num_neurons <- nrow(read_csv(files, col_names = FALSE, show_col_types = FALSE))
+        } else {
+          num_neurons <- NA
+        }
+        
+        range_results <- rbind(range_results, data.frame(
+          Mouse = mouse_id,
+          Condition = condition,
+          DataType = data_type,
+          NumNeurons = num_neurons,
+          Min_Distance = min(off_diag, na.rm = TRUE),
+          Max_Distance = max(off_diag, na.rm = TRUE),
+          Mean_Distance = mean(off_diag, na.rm = TRUE),
+          SD_Distance = sd(off_diag, na.rm = TRUE)
+        ))
+      }
+    }
+  }
+}
+
+# Print full table
+cat("\n====== Raw Distance Ranges (sqrt(1 - r_spearman), off-diagonal only) ======\n\n")
+print(range_results, digits = 4, row.names = FALSE)
+
+# Summary across all mice for combined data type, awake condition
+combined_awake <- range_results %>%
+  filter(DataType == "combined", Condition == "Awake")
+
+cat("\n====== Summary for Combined Awake Mice ======\n")
+cat("Overall min distance across mice:", round(min(combined_awake$Min_Distance), 4), "\n")
+cat("Overall max distance across mice:", round(max(combined_awake$Max_Distance), 4), "\n")
+cat("Range of individual mouse max distances:", 
+    round(min(combined_awake$Max_Distance), 4), "to", 
+    round(max(combined_awake$Max_Distance), 4), "\n")
+cat("Grand mean distance:", round(mean(combined_awake$Mean_Distance), 4), "\n")
+
+# Also summarise anaesthetised
+combined_anes <- range_results %>%
+  filter(DataType == "combined", Condition == "Anaesthetised")
+
+cat("\n====== Summary for Combined Anaesthetised Mice ======\n")
+cat("Overall min distance across mice:", round(min(combined_anes$Min_Distance), 4), "\n")
+cat("Overall max distance across mice:", round(max(combined_anes$Max_Distance), 4), "\n")
+cat("Range of individual mouse max distances:", 
+    round(min(combined_anes$Max_Distance), 4), "to", 
+    round(max(combined_anes$Max_Distance), 4), "\n")
+cat("Grand mean distance:", round(mean(combined_anes$Mean_Distance), 4), "\n")
+
+# Save to CSV for reference
+write.csv(range_results, file.path(figure_dir, "raw_distance_ranges.csv"), row.names = FALSE)
+cat("\nSaved to:", file.path(figure_dir, "raw_distance_ranges.csv"), "\n")
 
 ```
 
@@ -4026,11 +5709,11 @@ create_modified_plot_with_icons <- function(mds_df, title) {
                ggtitle(title) +
                theme_pubr() +
                theme(
-                 axis.title.x = element_text(size = 40, face = "plain"),
+                 axis.title.x = element_text(size = 45, face = "plain"),
                  axis.text.x = element_text(size = 40, face = "plain"),
-                 axis.title.y = element_text(size = 40, face = "plain"),
+                 axis.title.y = element_text(size = 45, face = "plain"),
                  axis.text.y = element_text(size = 40, face = "plain"),
-                 axis.line = element_line(size = 1.1))
+                 axis.line = element_line(size = 1.5))
               # geom_vline(xintercept = 0, linetype = "solid", size = 0.25, color = "black") + # Add vertical line at x = 0
               # geom_hline(yintercept = 0, linetype = "solid", size = 0.25, color = "black") # Add horizontal line at y = 0
 
@@ -5337,7 +7020,7 @@ make_long_df <- function(mat_original, mat_originalNA, mat_transformed, mouse_id
   # 4A. Melt original
   df_orig <- as.data.frame(mat_original) %>%
     rownames_to_column("Stim1") %>%
-    pivot_longer(cols = -Stim1, names_to = "Stim2", values_to = "OriginalDistance")
+    pivot_longer(cols = -Stim1, nameanovas_to = "Stim2", values_to = "OriginalDistance")
   
   # 4B. Melt originalNoDiag
   df_origNA <- as.data.frame(mat_originalNA) %>%
@@ -5536,44 +7219,38 @@ model_order <- model_info_long %>%
 
 model_info_long$Model <- factor(model_info_long$Model, levels = model_order)
 
-aic_values   <- model_info_long$Value[model_info_long$Metric == "AIC"]
+# Tag each row with family + metric and build the palette
+model_info_long <- build_family_fill(model_info_long)
+fill_palette   <- build_fill_palette()
 
-# Define the lower and upper limits for the y-axis
-lower_limit  <- floor((min(aic_values, na.rm = TRUE) - 100) / 500) * 500
-upper_limit  <- ceiling((max(aic_values, na.rm = TRUE) + 100) / 500) * 500
-
-# Generate 5 ticks, evenly spaced from lower_limit to upper_limit
-y_ticks      <- seq(lower_limit, upper_limit, length.out = 5)
-
-# Plot the AIC/BIC comparison with 5 intervals
-p_aic_bic <- ggplot(model_info_long, aes(x = Model, y = Value, fill = Metric)) +
+p_aic_bic <- ggplot(model_info_long, aes(x = Model, y = Value, fill = FillKey)) +
   geom_col(position = position_dodge(width = 0.8), color = "black") +
-  coord_cartesian(ylim = c(lower_limit, upper_limit)) +
-  scale_y_continuous(breaks = y_ticks) +  # Set the breaks to 5 intervals
-  scale_fill_manual(values = c("AIC" = "orange", "BIC" = "red")) +
+  scale_fill_manual(
+    values = fill_palette,
+    labels = fill_labels,
+    name   = "Model family"
+  ) +
   theme_pubr() +
-  coord_flip(ylim = c(28000, 51500)) + 
-
-  labs(
-    x     = NULL,
-    y     = "Value"
-  ) +
+  coord_flip(ylim = c(28000, 51500)) +
+  labs(x = NULL, y = "Value") +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 20),  # Increase x-axis text size
-    axis.text.y = element_text(size = 24),                        # Increase y-axis text size
-    axis.title.y = element_text(size = 18),                        # Increase y-axis text size
-
-    legend.position = "right",                                     # Keep legend position
-    legend.text = element_text(size = 18),                         # Increase legend text size
-    legend.title = element_text(size = 18),                        # Increase legend title size
-    plot.title = element_blank()                                    # Remove plot title
-  ) +
-  guides(
-    fill = guide_legend(keyheight = 2, keywidth = 2)  # Increase the size of the legend squares
+    plot.title       = element_text(hjust = 0.5, face = "plain", size = 20),
+    axis.title.x     = element_blank(),
+    axis.title.y     = element_text(size = 50, face = "plain"),
+    axis.text.x      = element_text(angle = 45, hjust = 1, size = 40, face = "plain"),
+    axis.ticks.length.x = unit(1, "cm"),
+    axis.text.y      = element_text(size = 25, face = "plain", colour = "black"),
+    axis.line        = element_line(size = 1.5),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid.minor = element_blank(),
+    legend.position  = "right",
+    legend.text      = element_text(size = 18),
+    legend.title     = element_text(size = 18),
+    legend.key.size  = unit(0.8, "cm")
   )
 
 print(p_aic_bic)
-ggsave("AIC_BIC_mice.png", plot = p_aic_bic, width = 20, height = 10, dpi = 300)
+ggsave("AIC_BIC_mice.png", plot = p_aic_bic, width = 14, height = 10, dpi = 300)
 
 ###############################################################################
 # 10. Save Chi-square and Likelihood Ratio Test Output to Files
@@ -5691,6 +7368,813 @@ for (m in names(lme_models)) {
 sink()
 cat("Fixed-effect estimates and β-scaled coefficients saved to:", fe_out_file, "\n")
 
+```
+## LME CHECK
+```{r, LME check}
+###############################################################################
+# 0. Load packages
+###############################################################################
+library(lme4)       # for lmer()
+library(lmerTest)   # for extended summary/ANOVA with sums of squares, DFs, etc.
+library(dplyr)      
+library(tidyr)      
+library(stringr)    
+library(tibble)     
+library(ggplot2)    
+library(ggpubr)     
+
+###############################################################################
+# 1. User-defined options
+###############################################################################
+remove_diagonal_for_transform <- TRUE  # set TRUE if the transform should omit diagonal
+keep_SFs        <- c(2, 4, 8, 16, 32)  
+eps             <- 0.001
+
+# Which transform do you want to use for zDistance?
+#  "MAX2"        -> (x + eps)/(2 + 2*eps)
+#  "TRUE_MAX"    -> (x + eps)/(global_max + 2*eps)
+transform_choice <- "TRUE_MAX"
+
+# Which distance column do we use for the LME analysis?
+# Options: "OriginalDistance", "OriginalNoDiag", "zDistance"
+distanceChoice <- "zDistance"
+
+###############################################################################
+# 2. Define transform functions (unchanged)
+###############################################################################
+logit_transform_MAX2 <- function(x, eps = eps) {
+  y <- (x + eps)/(2 + 2*eps)
+  log(y / (1 - y))
+}
+
+logit_transform_TRUE_MAX <- function(x, eps = eps, max_val) {
+  y <- (x + eps)/(max_val + 2*eps)
+  log(y / (1 - y))
+}
+
+###############################################################################
+# 3. Collect all original matrices, create both 'OriginalDistance' & 'OriginalNoDiag'
+#    Then apply chosen transform to the 'OriginalNoDiag' version
+###############################################################################
+all_matrices_original     <- list() # with diagonal intact
+all_matrices_originalNA   <- list() # diagonal set to NA
+all_matrices_transformed  <- list() # logit transform (from originalNoDiag)
+
+for (mouse_id in 0:9) {
+  for (condition in c("awake", "anaesthetised")) {
+    mat_name <- paste0("Mouse", mouse_id, "_", condition, "_combined_distmatrix")
+    if (!exists(mat_name, envir = .GlobalEnv)) {
+      cat("Matrix not found:", mat_name, "\n")
+      next
+    }
+    dist_mat <- get(mat_name, envir = .GlobalEnv)
+    
+    # Store "original" as is
+    key <- paste0("Mouse", mouse_id, "_", condition)
+    all_matrices_original[[key]] <- dist_mat
+    
+    # Make a copy with diagonal NA
+    dist_mat_no_diag <- dist_mat
+    diag_idx <- row(dist_mat_no_diag) == col(dist_mat_no_diag)
+    dist_mat_no_diag[diag_idx] <- NA
+    all_matrices_originalNA[[key]] <- dist_mat_no_diag
+  }
+}
+
+# If we might need TRUE_MAX, find global_max from the diagonal-removed version:
+global_max <- 0
+for (nm in names(all_matrices_originalNA)) {
+  current_mat <- all_matrices_originalNA[[nm]]
+  cur_max     <- max(current_mat, na.rm = TRUE)
+  if (cur_max > global_max) {
+    global_max <- cur_max
+  }
+}
+cat("Global max distance (after diag removal) =", global_max, "\n")
+
+# define transform wrapper for the "noDiag" version
+apply_chosen_transform <- function(x) {
+  if (transform_choice == "MAX2") {
+    return(logit_transform_MAX2(x, eps = eps))
+  } else if (transform_choice == "TRUE_MAX") {
+    return(logit_transform_TRUE_MAX(x, eps = eps, max_val = global_max))
+  } else {
+    stop("Unknown transform_choice:", transform_choice)
+  }
+}
+
+# Now create the transformed version from the noDiag matrix
+for (nm in names(all_matrices_originalNA)) {
+  dist_mat_no_diag <- all_matrices_originalNA[[nm]]
+  norm_mat <- apply_chosen_transform(dist_mat_no_diag)
+  all_matrices_transformed[[nm]] <- norm_mat
+  
+  # Save the normalized matrix to the environment
+  new_mat_name <- paste0(nm, "_combined_norm_distmatrix")
+  assign(new_mat_name, norm_mat, envir = .GlobalEnv)
+}
+
+###############################################################################
+# 4. Helper functions for stimulus parsing and direction/orientation diffs
+###############################################################################
+parse_stim <- function(stim_str) {
+  parts <- strsplit(stim_str, "_")[[1]]
+  list(SF = as.numeric(parts[1]), Dir = as.numeric(parts[2]))
+}
+
+get_direction_diff <- function(d1, d2) {
+  diff <- abs(d1 - d2)
+  if (diff > 180) diff <- 360 - diff
+  diff
+}
+
+get_orientation_diff <- function(d1, d2) {
+  diff <- abs(d1 - d2)
+  if (diff > 180) diff <- 360 - diff
+  if (diff > 90)  diff <- 180 - diff
+  diff
+}
+
+get_dir_category <- function(diff) {
+  if (diff == 0) {
+    "0"
+  } else if (diff == 180) {
+    "180"
+  } else if (diff == 90) {
+    "90"
+  } else {
+    "others"
+  }
+}
+
+###############################################################################
+# 5. Create a function to melt all 3 versions into a single data frame
+#    with columns: OriginalDistance, OriginalNoDiag, zDistance
+###############################################################################
+make_long_df <- function(mat_original, mat_originalNA, mat_transformed, mouse_id, condition) {
+  
+  df_orig <- as.data.frame(mat_original) %>%
+    rownames_to_column("Stim1") %>%
+    pivot_longer(cols = -Stim1, names_to = "Stim2", values_to = "OriginalDistance")
+  
+  df_origNA <- as.data.frame(mat_originalNA) %>%
+    rownames_to_column("Stim1") %>%
+    pivot_longer(cols = -Stim1, names_to = "Stim2", values_to = "OriginalNoDiag")
+  
+  df_trans <- as.data.frame(mat_transformed) %>%
+    rownames_to_column("Stim1") %>%
+    pivot_longer(cols = -Stim1, names_to = "Stim2", values_to = "zDistance")
+  
+  merged1 <- left_join(df_orig,   df_origNA, by = c("Stim1", "Stim2"))
+  merged2 <- left_join(merged1,   df_trans,  by = c("Stim1", "Stim2"))
+  
+  merged2 <- merged2 %>%
+    mutate(
+      Mouse   = mouse_id,
+      WakeAne = ifelse(condition == "awake", "Awake", "Anaesthetised")
+    )
+  merged2
+}
+
+###############################################################################
+# 5B. Build master_df with all 3 columns
+###############################################################################
+all_data <- list()
+
+for (mouse_id in 0:9) {
+  for (condition in c("awake", "anaesthetised")) {
+    key <- paste0("Mouse", mouse_id, "_", condition)
+    if (! (key %in% names(all_matrices_original))) {
+      cat("Skipping missing data for", key, "\n")
+      next
+    }
+    mat_orig     <- all_matrices_original[[key]]
+    mat_origNA   <- all_matrices_originalNA[[key]]
+    mat_trans    <- all_matrices_transformed[[key]]
+    
+    df_long <- make_long_df(mat_orig, mat_origNA, mat_trans, mouse_id, condition)
+    all_data[[key]] <- df_long
+  }
+}
+
+master_df <- bind_rows(all_data)
+
+###############################################################################
+# 6. Create DirectionDiff, OrientationDiff, DirCategory, SF
+###############################################################################
+master_df <- as.data.frame(master_df)
+
+master_df <- master_df %>%
+  rowwise() %>%
+  mutate(
+    SF1 = parse_stim(Stim1)$SF,
+    Dir1 = parse_stim(Stim1)$Dir,
+    SF2 = parse_stim(Stim2)$SF,
+    Dir2 = parse_stim(Stim2)$Dir,
+    
+    DirectionDiff   = get_direction_diff(Dir1, Dir2),
+    OrientationDiff = get_orientation_diff(Dir1, Dir2),
+    DirCategory     = get_dir_category(DirectionDiff),
+    
+    abs_SF_diff     = abs(log2(SF1) - log2(SF2)),
+    abs_SF_diff     = factor(abs_SF_diff)
+
+  ) %>%
+  ungroup()
+
+###############################################################################
+# 6B. Filter out SF groups not in keep_SFs
+###############################################################################
+master_df <- master_df %>%
+  filter(SF1 %in% keep_SFs & SF2 %in% keep_SFs)
+
+###############################################################################
+# 7. CHOOSE which distance column we'll actually use for LME
+#    Create a new column "AnalysisDistance" based on `distanceChoice`
+###############################################################################
+if (! distanceChoice %in% c("OriginalDistance","OriginalNoDiag","zDistance")) {
+  stop("distanceChoice must be one of: OriginalDistance, OriginalNoDiag, zDistance")
+}
+
+master_df <- master_df %>%
+  mutate(AnalysisDistance = case_when(
+    distanceChoice == "OriginalDistance" ~ OriginalDistance,
+    distanceChoice == "OriginalNoDiag"   ~ OriginalNoDiag,
+    distanceChoice == "zDistance"        ~ zDistance
+  ))
+
+###############################################################################
+# 8. Fit LME models using AnalysisDistance (PRIMARY ANALYSIS)
+###############################################################################
+model_formulas <- list(
+  "Null"                                     = "AnalysisDistance ~ (1 | Mouse)",
+  "SF"                                = "AnalysisDistance ~ abs_SF_diff + (1 | Mouse)",
+  "WakeAne"                           = "AnalysisDistance ~ WakeAne + (1 | Mouse)",
+  "WakeAne + SF"                      = "AnalysisDistance ~ WakeAne + abs_SF_diff + (1 | Mouse)",
+
+  "Direction"                         = "AnalysisDistance ~ DirectionDiff + (1 | Mouse)",
+  "Direction + WakeAne"               = "AnalysisDistance ~ DirectionDiff + WakeAne + (1 | Mouse)",
+  "Direction + SF"                    = "AnalysisDistance ~ DirectionDiff + abs_SF_diff + (1 | Mouse)",
+  "Direction * SF"                      = "AnalysisDistance ~ DirectionDiff * abs_SF_diff + (1 | Mouse)",
+  "Direction * SF + WakeAne"            = "AnalysisDistance ~ DirectionDiff * abs_SF_diff + WakeAne + (1 | Mouse)",
+  
+  "Orientation"                       = "AnalysisDistance ~ OrientationDiff + (1 | Mouse)",
+  "Orientation + SF"                  = "AnalysisDistance ~ OrientationDiff + abs_SF_diff + (1 | Mouse)",
+  "Orientation + WakeAne"             = "AnalysisDistance ~ OrientationDiff + WakeAne + (1 | Mouse)",
+  "Orientation * SF"                    = "AnalysisDistance ~ OrientationDiff * abs_SF_diff + (1 | Mouse)",
+  "Orientation * SF + WakeAne"          = "AnalysisDistance ~ OrientationDiff * abs_SF_diff + WakeAne + (1 | Mouse)",
+  
+  "Category"                          = "AnalysisDistance ~ DirCategory + (1 | Mouse)",
+  "Category + SF"                     = "AnalysisDistance ~ DirCategory + abs_SF_diff + (1 | Mouse)",
+  "Category + WakeAne"                = "AnalysisDistance ~ DirCategory + WakeAne + (1 | Mouse)",
+  "Category * SF"                       = "AnalysisDistance ~ DirCategory * abs_SF_diff + (1 | Mouse)",
+  "Category * SF + WakeAne"             = "AnalysisDistance ~ DirCategory * abs_SF_diff + WakeAne + (1 | Mouse)"
+)
+
+lme_models <- list()
+
+for (model_label in names(model_formulas)) {
+  fml <- as.formula(model_formulas[[model_label]])
+  cat("\nFitting model:", model_label, "...\n")
+  mdl <- lmer(fml, data = master_df, REML = FALSE)
+  lme_models[[model_label]] <- mdl
+}
+
+###############################################################################
+# 9. Gather AIC, BIC, logLik for primary analysis
+###############################################################################
+model_info <- data.frame(Model  = character(),
+                         AIC    = numeric(),
+                         BIC    = numeric(),
+                         logLik = numeric(),
+                         stringsAsFactors = FALSE)
+
+for (m in names(lme_models)) {
+  mdl <- lme_models[[m]]
+  model_info <- rbind(
+    model_info,
+    data.frame(
+      Model  = m,
+      AIC    = AIC(mdl),
+      BIC    = BIC(mdl),
+      logLik = as.numeric(logLik(mdl))
+    )
+  )
+}
+
+cat("\n======== MODEL INFO (PRIMARY) ========\n")
+print(model_info)
+
+###############################################################################
+# 10. Plot AIC & BIC side-by-side (primary analysis)
+###############################################################################
+model_info_long <- model_info %>%
+  pivot_longer(cols = c("AIC", "BIC"),
+               names_to = "Metric",
+               values_to = "Value")
+
+model_order <- model_info_long %>%
+  filter(Metric == "AIC") %>%
+  arrange(desc(Value)) %>%
+  pull(Model)
+
+model_info_long$Model <- factor(model_info_long$Model, levels = model_order)
+
+# Tag each row with family + metric and build the palette
+model_info_long <- build_family_fill(model_info_long)
+fill_palette   <- build_fill_palette()
+
+p_aic_bic <- ggplot(model_info_long, aes(x = Model, y = Value, fill = FillKey)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black") +
+  scale_fill_manual(values = fill_palette, guide = "none") +
+  theme_pubr() +
+  coord_flip(ylim = c(28000, 51500)) +
+  labs(x = NULL, y = "Value") +
+  theme(
+    axis.text.x = element_text(size = 26),
+    axis.text.y = element_text(size = 28),
+    axis.title.x = element_text(size = 24),
+    plot.title = element_blank()
+  )
+
+print(p_aic_bic)
+ggsave("AIC_BIC_mice.png",
+       plot = p_aic_bic, width = 12, height = 10, dpi = 300)
+
+###############################################################################
+# 11. Save Chi-square and Likelihood Ratio Test Output to Files
+###############################################################################
+
+sink("chi_square_results.txt")
+for (m in names(lme_models)) {
+  cat("\n===== Chi-square for model:", m, "=====\n")
+  print(drop1(lme_models[[m]], test = "Chisq"))
+}
+sink()
+
+sink("lrt_results.txt")
+for (m in names(lme_models)) {
+  cat("\n===== Likelihood Ratio Test for model:", m, "=====\n")
+  lrt_result <- anova(lme_models[[m]])
+  print(lrt_result)
+}
+sink()
+
+cat("\nPrimary analysis complete.\n")
+
+###############################################################################
+# 12. Detailed Chi-square and Nested LRT for Mouse LME Analysis
+###############################################################################
+
+sink("chi_square_results_detailed_mice.txt")
+for (m in names(lme_models)) {
+  cat("\n===== Chi-square (Type III) for model:", m, "=====\n")
+  chi_result <- drop1(lme_models[[m]], test = "Chisq")
+  print(chi_result)
+}
+sink()
+
+nested_comparisons <- list(
+  c("Null", "SF"),
+  c("Null", "WakeAne"),
+  c("SF", "WakeAne + SF"),
+
+  c("Null", "Direction"),
+  c("Direction", "Direction + WakeAne"),
+  c("Direction", "Direction + SF"),
+  c("Direction + SF", "Direction * SF"),
+  c("Direction * SF", "Direction * SF + WakeAne"),
+
+  c("Null", "Orientation"),
+  c("Orientation", "Orientation + WakeAne"),
+  c("Orientation", "Orientation + SF"),
+  c("Orientation + SF", "Orientation * SF"),
+  c("Orientation * SF", "Orientation * SF + WakeAne"),
+  
+  c("Null", "Category"),
+  c("Category", "Category + WakeAne"),
+  c("Category", "Category + SF"),
+  c("Category + SF", "Category * SF"),
+  c("Category * SF", "Category * SF + WakeAne")
+)
+
+options(digits = 10)
+
+sink("LRT_results_detailed_mice.txt")
+for (comparison in nested_comparisons) {
+  m1 <- comparison[1]
+  m2 <- comparison[2]
+  cat("\n===== LRT between", m1, "and", m2, "=====\n")
+  lrt_result <- anova(lme_models[[m1]], lme_models[[m2]])
+  print(lrt_result)
+}
+sink()
+cat("Detailed Chi-square and LRT results saved successfully.\n")
+
+###############################################################################
+# 13. Fixed-effect estimates +/- SE, t/z, 95% CI + beta-scaled (mice)
+###############################################################################
+
+library(broom.mixed)
+library(parameters)
+
+fe_out_file <- "fixed_effects_with_CI_mice.txt"
+sink(fe_out_file)
+
+for (m in names(lme_models)) {
+  cat("\n===== Fixed-effects summary for model:", m, "=====\n")
+  
+  fe_tbl <- tidy(
+    lme_models[[m]],
+    effects     = "fixed",
+    conf.int    = TRUE,
+    conf.method = "Wald"
+  )
+  print(fe_tbl, row.names = FALSE)
+  
+  cat("\nStandardised (beta-scaled) estimates (post-hoc):\n")
+  beta_tbl <- standardize_parameters(
+    lme_models[[m]],
+    method = "posthoc",
+    ci     = 0.95
+  )
+  print(beta_tbl, row.names = FALSE)
+}
+
+sink()
+cat("Fixed-effect estimates and beta-scaled coefficients saved to:", fe_out_file, "\n")
+
+###############################################################################
+###############################################################################
+#
+#  PART B: NORMALIZATION ROBUSTNESS COMPARISON
+#
+#  Compares LME results under three normalization approaches:
+#    A) GLOBAL_MAX  — single max across all mice & conditions (what the code does)
+#    B) PER_MOUSE_CONDITION — per-mouse, per-condition max 
+#    C) THEORETICAL_MAX — divide by sqrt(2) (theoretical ceiling)
+#
+###############################################################################
+###############################################################################
+
+cat("\n\n")
+cat("================================================================\n")
+cat("  STARTING NORMALIZATION ROBUSTNESS COMPARISON\n")
+cat("================================================================\n\n")
+
+###############################################################################
+# B1. Compute the three different denominators
+###############################################################################
+
+# A) Global max across all mice and conditions (already computed above)
+cat("Global max (already computed):", global_max, "\n")
+
+# B) Per-mouse, per-condition max
+per_mouse_cond_max <- sapply(all_matrices_originalNA, function(m) max(m, na.rm = TRUE))
+cat("Per-mouse-condition maxima:\n")
+print(per_mouse_cond_max)
+
+# C) Theoretical max
+theoretical_max <- sqrt(2)
+cat("Theoretical max (sqrt(2)):", theoretical_max, "\n")
+
+###############################################################################
+# B2. Generic logit transform with any denominator
+###############################################################################
+logit_with_denom <- function(x, eps, denom) {
+  y <- (x + eps) / (denom + 2 * eps)
+  log(y / (1 - y))
+}
+
+###############################################################################
+# B3. Build master_df_comparison with all three transforms
+###############################################################################
+all_data_comp <- list()
+
+for (mouse_id in 0:9) {
+  for (condition in c("awake", "anaesthetised")) {
+    key <- paste0("Mouse", mouse_id, "_", condition)
+    if (!(key %in% names(all_matrices_originalNA))) next
+    
+    mat <- all_matrices_originalNA[[key]]
+    local_max <- per_mouse_cond_max[[key]]
+    
+    # Apply three transforms
+    z_global      <- logit_with_denom(mat, eps, global_max)
+    z_per_mc      <- logit_with_denom(mat, eps, local_max)
+    z_theoretical <- logit_with_denom(mat, eps, theoretical_max)
+    
+    # Melt original
+    df_orig <- as.data.frame(mat) %>%
+      rownames_to_column("Stim1") %>%
+      pivot_longer(-Stim1, names_to = "Stim2", values_to = "OrigDist")
+    
+    # Melt global
+    df_global <- as.data.frame(z_global) %>%
+      rownames_to_column("Stim1") %>%
+      pivot_longer(-Stim1, names_to = "Stim2", values_to = "z_global")
+    
+    # Melt per-mouse-condition
+    df_permc <- as.data.frame(z_per_mc) %>%
+      rownames_to_column("Stim1") %>%
+      pivot_longer(-Stim1, names_to = "Stim2", values_to = "z_per_mc")
+    
+    # Melt theoretical
+    df_theo <- as.data.frame(z_theoretical) %>%
+      rownames_to_column("Stim1") %>%
+      pivot_longer(-Stim1, names_to = "Stim2", values_to = "z_theoretical")
+    
+    # Merge
+    df <- df_orig %>%
+      left_join(df_global, by = c("Stim1", "Stim2")) %>%
+      left_join(df_permc, by = c("Stim1", "Stim2")) %>%
+      left_join(df_theo,  by = c("Stim1", "Stim2")) %>%
+      mutate(
+        Mouse   = mouse_id,
+        WakeAne = ifelse(condition == "awake", "Awake", "Anaesthetised")
+      )
+    
+    all_data_comp[[key]] <- df
+  }
+}
+
+master_df_comp <- bind_rows(all_data_comp)
+
+# Add stimulus features
+master_df_comp <- master_df_comp %>%
+  rowwise() %>%
+  mutate(
+    SF1 = parse_stim(Stim1)$SF,
+    Dir1 = parse_stim(Stim1)$Dir,
+    SF2 = parse_stim(Stim2)$SF,
+    Dir2 = parse_stim(Stim2)$Dir,
+    DirectionDiff   = get_direction_diff(Dir1, Dir2),
+    OrientationDiff = get_orientation_diff(Dir1, Dir2),
+    DirCategory     = get_dir_category(DirectionDiff),
+    abs_SF_diff     = factor(abs(log2(SF1) - log2(SF2)))
+  ) %>%
+  ungroup() %>%
+  filter(SF1 %in% keep_SFs & SF2 %in% keep_SFs)
+
+# Remove diagonal (NA) rows
+master_df_comp <- master_df_comp %>% filter(!is.na(OrigDist))
+
+###############################################################################
+# B4. Define model formulas for comparison (RHS only, DV prepended per scheme)
+###############################################################################
+comp_model_formulas <- list(
+  "Null"                    = "~ (1 | Mouse)",
+  "SF"                      = "~ abs_SF_diff + (1 | Mouse)",
+  "WakeAne"                 = "~ WakeAne + (1 | Mouse)",
+  "WakeAne + SF"            = "~ WakeAne + abs_SF_diff + (1 | Mouse)",
+  "Direction"               = "~ DirectionDiff + (1 | Mouse)",
+  "Direction + WakeAne"     = "~ DirectionDiff + WakeAne + (1 | Mouse)",
+  "Direction + SF"          = "~ DirectionDiff + abs_SF_diff + (1 | Mouse)",
+  "Direction * SF"          = "~ DirectionDiff * abs_SF_diff + (1 | Mouse)",
+  "Direction * SF + WakeAne"= "~ DirectionDiff * abs_SF_diff + WakeAne + (1 | Mouse)",
+  "Orientation"             = "~ OrientationDiff + (1 | Mouse)",
+  "Orientation + SF"        = "~ OrientationDiff + abs_SF_diff + (1 | Mouse)",
+  "Orientation + WakeAne"   = "~ OrientationDiff + WakeAne + (1 | Mouse)",
+  "Orientation * SF"        = "~ OrientationDiff * abs_SF_diff + (1 | Mouse)",
+  "Orientation * SF + WakeAne" = "~ OrientationDiff * abs_SF_diff + WakeAne + (1 | Mouse)",
+  "Category"                = "~ DirCategory + (1 | Mouse)",
+  "Category + SF"           = "~ DirCategory + abs_SF_diff + (1 | Mouse)",
+  "Category + WakeAne"      = "~ DirCategory + WakeAne + (1 | Mouse)",
+  "Category * SF"           = "~ DirCategory * abs_SF_diff + (1 | Mouse)",
+  "Category * SF + WakeAne" = "~ DirCategory * abs_SF_diff + WakeAne + (1 | Mouse)"
+)
+
+###############################################################################
+# B5. Fit all models under each normalization scheme
+###############################################################################
+norm_schemes  <- c("z_global", "z_per_mc", "z_theoretical")
+scheme_labels <- c("Global Max", "Per-Mouse-Condition Max", "Theoretical Max (sqrt2)")
+names(scheme_labels) <- norm_schemes
+
+all_comp_results <- list()
+
+for (scheme in norm_schemes) {
+  cat("\n========================================\n")
+  cat("  FITTING MODELS WITH:", scheme_labels[scheme], "\n")
+  cat("========================================\n")
+  
+  scheme_models <- list()
+  scheme_info   <- data.frame(Model = character(), AIC = numeric(), BIC = numeric(), 
+                              logLik = numeric(), stringsAsFactors = FALSE)
+  
+  for (model_label in names(comp_model_formulas)) {
+    fml_str <- paste0(scheme, " ", comp_model_formulas[[model_label]])
+    fml <- as.formula(fml_str)
+    
+    mdl <- tryCatch(
+      lmer(fml, data = master_df_comp, REML = FALSE),
+      error = function(e) { cat("  ERROR in", model_label, ":", e$message, "\n"); NULL }
+    )
+    
+    if (!is.null(mdl)) {
+      scheme_models[[model_label]] <- mdl
+      scheme_info <- rbind(scheme_info, data.frame(
+        Model  = model_label,
+        AIC    = AIC(mdl),
+        BIC    = BIC(mdl),
+        logLik = as.numeric(logLik(mdl))
+      ))
+    }
+  }
+  
+  all_comp_results[[scheme]] <- list(models = scheme_models, info = scheme_info)
+}
+
+###############################################################################
+# B6. Compare model rankings and WakeAne effect across schemes
+###############################################################################
+
+sink("normalization_comparison_results.txt")
+
+cat("================================================================\n")
+cat("  NORMALIZATION ROBUSTNESS COMPARISON\n")
+cat("================================================================\n")
+
+# --- Model rankings by AIC ---
+cat("\n\n--- MODEL RANKINGS BY AIC ---\n")
+for (scheme in norm_schemes) {
+  cat("\n===== ", scheme_labels[scheme], " =====\n")
+  info <- all_comp_results[[scheme]]$info
+  info_sorted <- info %>% arrange(AIC)
+  print(info_sorted, row.names = FALSE)
+  cat("\nBest model (AIC):", info_sorted$Model[1], "\n")
+}
+
+# --- Model rankings by BIC ---
+cat("\n\n--- MODEL RANKINGS BY BIC ---\n")
+for (scheme in norm_schemes) {
+  cat("\n===== ", scheme_labels[scheme], " =====\n")
+  info <- all_comp_results[[scheme]]$info
+  info_sorted <- info %>% arrange(BIC)
+  print(info_sorted, row.names = FALSE)
+  cat("\nBest model (BIC):", info_sorted$Model[1], "\n")
+}
+
+# --- WakeAne effect in best model with WakeAne ---
+cat("\n\n--- WAKEFULNESS EFFECT IN Category * SF + WakeAne ---\n")
+wake_model_label <- "Category * SF + WakeAne"
+
+for (scheme in norm_schemes) {
+  cat("\n===== ", scheme_labels[scheme], " =====\n")
+  
+  models <- all_comp_results[[scheme]]$models
+  
+  if (wake_model_label %in% names(models)) {
+    mdl_with <- models[[wake_model_label]]
+    cat("\nFixed effects:\n")
+    print(summary(mdl_with)$coefficients)
+    
+    # LRT: Category * SF + WakeAne vs Category * SF
+    mdl_without <- models[["Category * SF"]]
+    if (!is.null(mdl_without)) {
+      cat("\nLRT: Category * SF + WakeAne vs Category * SF:\n")
+      print(anova(mdl_without, mdl_with))
+    }
+  }
+}
+
+# --- Ranking consistency check (AIC) ---
+cat("\n\n--- RANKING CONSISTENCY (AIC) ---\n")
+for (scheme in norm_schemes) {
+  info <- all_comp_results[[scheme]]$info
+  cat(scheme_labels[scheme], "- Best model (AIC):", 
+      info$Model[which.min(info$AIC)], "\n")
+}
+
+cat("\nSpearman rank correlation of AIC rankings across schemes:\n")
+aic_matrix <- matrix(NA, nrow = nrow(all_comp_results[[1]]$info), ncol = length(norm_schemes))
+colnames(aic_matrix) <- scheme_labels
+
+for (i in seq_along(norm_schemes)) {
+  info <- all_comp_results[[norm_schemes[i]]]$info
+  aic_matrix[, i] <- info$AIC[match(all_comp_results[[1]]$info$Model, info$Model)]
+}
+
+rank_cors_aic <- cor(apply(aic_matrix, 2, rank), method = "spearman")
+print(rank_cors_aic)
+
+# --- Ranking consistency check (BIC) ---
+cat("\n\n--- RANKING CONSISTENCY (BIC) ---\n")
+for (scheme in norm_schemes) {
+  info <- all_comp_results[[scheme]]$info
+  cat(scheme_labels[scheme], "- Best model (BIC):", 
+      info$Model[which.min(info$BIC)], "\n")
+}
+
+cat("\nSpearman rank correlation of BIC rankings across schemes:\n")
+bic_matrix <- matrix(NA, nrow = nrow(all_comp_results[[1]]$info), ncol = length(norm_schemes))
+colnames(bic_matrix) <- scheme_labels
+
+for (i in seq_along(norm_schemes)) {
+  info <- all_comp_results[[norm_schemes[i]]]$info
+  bic_matrix[, i] <- info$BIC[match(all_comp_results[[1]]$info$Model, info$Model)]
+}
+
+rank_cors_bic <- cor(apply(bic_matrix, 2, rank), method = "spearman")
+print(rank_cors_bic)
+
+sink()
+
+###############################################################################
+# B7. Create delta-AIC and delta-BIC comparison plots
+###############################################################################
+
+# --- Combine all scheme results ---
+plot_data_comp <- data.frame()
+for (scheme in norm_schemes) {
+  info <- all_comp_results[[scheme]]$info
+  info$Scheme <- scheme_labels[scheme]
+  plot_data_comp <- rbind(plot_data_comp, info)
+}
+
+# --- Delta AIC ---
+plot_data_aic <- plot_data_comp %>%
+  group_by(Scheme) %>%
+  mutate(deltaAIC = AIC - min(AIC)) %>%
+  ungroup()
+
+model_order_aic <- plot_data_aic %>%
+  filter(Scheme == "Global Max") %>%
+  arrange(desc(deltaAIC)) %>%
+  pull(Model)
+
+plot_data_aic$Model <- factor(plot_data_aic$Model, levels = model_order_aic)
+
+p_delta_aic <- ggplot(plot_data_aic, aes(x = Model, y = deltaAIC, fill = Scheme)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black", width = 0.7) +
+  coord_flip() +
+  scale_fill_manual(values = c("Global Max" = "steelblue", 
+                                "Per-Mouse-Condition Max" = "coral",
+                                "Theoretical Max (sqrt2)" = "darkgreen")) +
+  theme_pubr() +
+  labs(
+    x = NULL,
+    y = expression(Delta ~ "AIC (from best model within each scheme)"),
+    fill = "Normalisation"
+  ) +
+  theme(
+    axis.text.y  = element_text(size = 14),
+    axis.text.x  = element_text(size = 12),
+    legend.position = "right",
+    axis.title.x = element_text(size = 14),
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 14)
+  )
+
+print(p_delta_aic)
+ggsave("normalization_comparison_deltaAIC.png", plot = p_delta_aic, 
+       width = 16, height = 10, dpi = 300)
+
+# --- Delta BIC ---
+plot_data_bic <- plot_data_comp %>%
+  group_by(Scheme) %>%
+  mutate(deltaBIC = BIC - min(BIC)) %>%
+  ungroup()
+
+model_order_bic <- plot_data_bic %>%
+  filter(Scheme == "Global Max") %>%
+  arrange(desc(deltaBIC)) %>%
+  pull(Model)
+
+plot_data_bic$Model <- factor(plot_data_bic$Model, levels = model_order_bic)
+
+p_delta_bic <- ggplot(plot_data_bic, aes(x = Model, y = deltaBIC, fill = Scheme)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black", width = 0.7) +
+  coord_flip() +
+  scale_fill_manual(values = c("Global Max" = "steelblue", 
+                                "Per-Mouse-Condition Max" = "coral",
+                                "Theoretical Max (sqrt2)" = "darkgreen")) +
+  theme_pubr() +
+  labs(
+    x = NULL,
+    y = expression(Delta ~ "BIC (from best model within each scheme)"),
+    fill = "Normalisation"
+  ) +
+  theme(
+    axis.text.y  = element_text(size = 14),
+    axis.text.x  = element_text(size = 12),
+    axis.title.x = element_text(size = 14),
+    legend.position = "right",
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 14)
+  )
+
+print(p_delta_bic)
+ggsave("normalization_comparison_deltaBIC.png", plot = p_delta_bic, 
+       width = 16, height = 10, dpi = 300)
+
+cat("\n================================================================\n")
+cat("  ALL DONE — Primary analysis + Normalization comparison\n")
+cat("================================================================\n")
+cat("Primary outputs: AIC_BIC_mice.png, chi_square_results.txt, etc.\n")
+cat("Comparison outputs: normalization_comparison_results.txt,\n")
+cat("                    normalization_comparison_deltaAIC.png\n")
+cat("                    normalization_comparison_deltaBIC.png\n")
 ```
 
 ## Diagonal For Mice 
@@ -7441,10 +9925,93 @@ create_average_dissimilarity_matrix <- function(trialdata, trial_type) {
   diag_df$Group[diag_df$AngularDifference == 0]   <- "Same"
   diag_df$Group[diag_df$AngularDifference == 180] <- "Opposite"
 
+  # Polynomial fit for orientation-only prediction test
+fit_quad <- lm(MeanDissimilarity ~ poly(AngularDifference, 2, raw = TRUE), data = diag_df)
+fit_lin  <- lm(MeanDissimilarity ~ AngularDifference, data = diag_df)
+
+cat("\n=== Polynomial fit:", trial_type, "===\n")
+print(summary(fit_quad))
+print(confint(fit_quad))
+cat("\nLinear vs quadratic F-test:\n")
+print(anova(fit_lin, fit_quad))
+
+# Save to file so you don't have to re-run to get the numbers
+sink(sprintf("pilot_trial_figres/poly_fit_%s.txt", trial_type))
+cat("=== Polynomial fit:", trial_type, "===\n")
+print(summary(fit_quad))
+print(confint(fit_quad))
+cat("\nLinear vs quadratic F-test:\n")
+print(anova(fit_lin, fit_quad))
+sink()
+
+# --- Constrained vs unconstrained polynomial: orientation-only test ---
+# Unconstrained quadratic: peak free to land anywhere
+fit_quad_free <- lm(MeanDissimilarity ~ poly(AngularDifference, 2, raw = TRUE),
+                    data = diag_df)
+
+# Constrained quadratic: forced symmetric about 90 (orientation-only prediction)
+# Equivalent to fitting only an intercept + (AngularDifference - 90)^2 term
+diag_df$AngDiff_centered_sq <- (diag_df$AngularDifference - 90)^2
+fit_quad_sym <- lm(MeanDissimilarity ~ AngDiff_centered_sq, data = diag_df)
+
+# Where does the unconstrained parabola actually peak?
+# For y = b0 + b1*x + b2*x^2, vertex is at x = -b1 / (2*b2)
+b <- coef(fit_quad_free)
+peak_x <- as.numeric(-b[2] / (2 * b[3]))
+
+# Asymmetry index: predicted dissimilarity at 0 vs at 180 from the unconstrained fit
+pred_at_0   <- predict(fit_quad_free, newdata = data.frame(AngularDifference = 0))
+pred_at_180 <- predict(fit_quad_free, newdata = data.frame(AngularDifference = 180))
+asym <- as.numeric(pred_at_180 - pred_at_0)
+
+# Model comparison: does releasing the symmetry constraint improve fit?
+# fit_quad_sym is nested in fit_quad_free (same df cost? No — sym has 1 predictor, free has 2)
+# So compare via anova / F-test
+aov_sym_vs_free <- anova(fit_quad_sym, fit_quad_free)
+
+cat("\n=== Orientation-only (symmetric) vs unconstrained quadratic:", trial_type, "===\n")
+cat("\nUnconstrained fit:\n")
+print(summary(fit_quad_free))
+cat("Vertex of unconstrained parabola: ", round(peak_x, 2), " degrees\n", sep = "")
+cat("Predicted dissimilarity at 0 deg:   ", round(pred_at_0, 3), "\n", sep = "")
+cat("Predicted dissimilarity at 180 deg: ", round(pred_at_180, 3), "\n", sep = "")
+cat("Asymmetry (180 - 0):                ", round(asym, 3), "\n\n", sep = "")
+
+cat("Symmetric (orientation-only) fit:\n")
+print(summary(fit_quad_sym))
+
+cat("\nF-test: does releasing symmetry improve fit?\n")
+print(aov_sym_vs_free)
+
+# Save to file
+sink(sprintf("pilot_trial_figres/orientation_test_%s.txt", trial_type))
+cat("=== Orientation-only (symmetric) vs unconstrained quadratic:", trial_type, "===\n\n")
+cat("Unconstrained fit:\n")
+print(summary(fit_quad_free))
+cat("\nVertex of unconstrained parabola: ", round(peak_x, 2), " degrees\n", sep = "")
+cat("Predicted dissimilarity at 0 deg:   ", round(pred_at_0, 3), "\n", sep = "")
+cat("Predicted dissimilarity at 180 deg: ", round(pred_at_180, 3), "\n", sep = "")
+cat("Asymmetry (180 - 0):                ", round(asym, 3), "\n\n", sep = "")
+cat("Symmetric (orientation-only) fit:\n")
+print(summary(fit_quad_sym))
+cat("\nF-test: does releasing symmetry improve fit?\n")
+print(aov_sym_vs_free)
+sink()
+
+
+
+
+
+  
   # Plot angular difference scatter
-  p_diag <- ggplot(diag_df, aes(AngularDifference, MeanDissimilarity, color = Group)) +
+p_diag <- ggplot(diag_df, aes(AngularDifference, MeanDissimilarity, color = Group)) +
+    geom_smooth(aes(group = 1),
+                method = "lm", formula = y ~ poly(x, 2),
+                se = TRUE, color = "black", fill = "grey80",
+                linetype = "dashed", linewidth = 1.2) +
+    geom_errorbar(aes(ymin = MeanDissimilarity - SD,
+                      ymax = MeanDissimilarity + SD), width = 4) +
     geom_point(size = 6) +
-    geom_errorbar(aes(ymin = MeanDissimilarity - SD, ymax = MeanDissimilarity + SD), width = 4) +
     labs(x = "Angular Difference (°)", y = "Mean Dissimilarity") +
     theme_pubr() +
     theme(
@@ -7534,6 +10101,84 @@ for (tt in trial_types) {
 
 ```
 
+```{r, non para pilot stat}
+library(dplyr)
+library(purrr)   # for reduce()
+
+# Function to compute angular difference (0°–180°)
+angular_diff <- function(a, b) {
+  diff <- abs(a - b) %% 360
+  pmin(diff, 360 - diff)
+}
+
+# Add (and round) angular difference column to avoid floating-point equality issues
+pilot_trialdata <- pilot_trialdata %>%
+  mutate(angular_diff = round(angular_diff(circle1_ori, circle2_ori)))
+
+# Define trial types
+trial_types <- c("0.005_trial", "0.04_trial", "0.3_trial")
+
+# Loop over trial types
+for (tt in trial_types) {
+  cat("\nTrial Type:", tt, "\n")
+  subset_data <- subset(pilot_trialdata, trial_type == tt)
+
+  # Compute participant-level means for each condition
+  df_180 <- subset(subset_data, angular_diff == 180) %>%
+    group_by(participant) %>%
+    summarise(mean_180 = mean(dissimilarity, na.rm = TRUE), .groups = "drop")
+
+  df_0 <- subset(subset_data, angular_diff == 0) %>%
+    group_by(participant) %>%
+    summarise(mean_0 = mean(dissimilarity, na.rm = TRUE), .groups = "drop")
+
+  df_less_than_180 <- subset(subset_data, angular_diff < 180 & angular_diff != 0) %>%
+    group_by(participant) %>%
+    summarise(mean_lt180 = mean(dissimilarity, na.rm = TRUE), .groups = "drop")
+
+  # Merge all three by participant
+  merged <- reduce(list(df_180, df_0, df_less_than_180), full_join, by = "participant")
+
+  # Descriptive stats
+  cat("Mean dissimilarity at 180°:", mean(merged$mean_180, na.rm = TRUE), "\n")
+  cat("SD at 180°:", sd(merged$mean_180, na.rm = TRUE), "\n")
+
+  # --- Wilcoxon signed-rank tests (paired, nonparametric) ---
+
+  # 180° vs 0°
+  idx_180_0 <- !is.na(merged$mean_180) & !is.na(merged$mean_0)
+  if (sum(idx_180_0) >= 2) {
+    cat("Wilcoxon signed-rank (paired) 180° vs 0° (n =", sum(idx_180_0), "participants):\n")
+    res_180_vs_0 <- wilcox.test(
+      merged$mean_180[idx_180_0],
+      merged$mean_0[idx_180_0],
+      paired = TRUE,
+      exact = FALSE,
+      alternative = "two.sided"
+    )
+    print(res_180_vs_0)
+  } else {
+    cat("Not enough paired data for 180° vs 0°\n")
+  }
+
+  # 180° vs <180°
+  idx_180_lt180 <- !is.na(merged$mean_180) & !is.na(merged$mean_lt180)
+  if (sum(idx_180_lt180) >= 2) {
+    cat("Wilcoxon signed-rank (paired) 180° vs <180° (n =", sum(idx_180_lt180), "participants):\n")
+    res_180_vs_lt180 <- wilcox.test(
+      merged$mean_180[idx_180_lt180],
+      merged$mean_lt180[idx_180_lt180],
+      paired = TRUE,
+      exact = FALSE,
+      alternative = "two.sided"
+    )
+    print(res_180_vs_lt180)
+  } else {
+    cat("Not enough paired data for 180° vs <180°\n")
+  }
+}
+```
+
 
 ```{r, pilot asym}
 library(dplyr)
@@ -7579,4 +10224,63 @@ for (tt in trial_types) {
   }
 }
 
+```
+
+```{r, non para}
+library(dplyr)
+
+# Function to compute angular difference
+angular_diff <- function(a, b) {
+  diff <- abs(a - b) %% 360
+  pmin(diff, 360 - diff)
+}
+
+# --- Prepare data once ---
+# 1) Add angular_diff
+# 2) (Optional) round angular_diff to avoid floating-point equality issues
+pilot_trialdata <- pilot_trialdata %>%
+  mutate(angular_diff = angular_diff(circle1_ori, circle2_ori),
+         angular_diff = round(angular_diff))
+
+# 3) Summarize to participant means per trial_type and angle
+data_sum <- pilot_trialdata %>%
+  group_by(trial_type, participant, angular_diff) %>%
+  summarise(mean_dissim = mean(dissimilarity, na.rm = TRUE), .groups = "drop")
+
+# Define trial types and symmetric pairs
+trial_types <- c("0.005_trial", "0.04_trial", "0.3_trial")
+angle_pairs <- list(c(18, 162), c(36, 144), c(54, 126), c(72, 108))
+
+# Loop through trial types and angle pairs
+for (tt in trial_types) {
+  cat("\nTrial Type:", tt, "\n")
+  data_tt <- filter(data_sum, trial_type == tt)
+  
+  for (pair in angle_pairs) {
+    a1 <- pair[1]
+    a2 <- pair[2]
+    
+    df_a1 <- data_tt %>%
+      filter(angular_diff == a1) %>%
+      select(participant, mean_a1 = mean_dissim)
+    
+    df_a2 <- data_tt %>%
+      filter(angular_diff == a2) %>%
+      select(participant, mean_a2 = mean_dissim)
+    
+    # Merge for paired comparison (within-participant)
+    merged <- inner_join(df_a1, df_a2, by = "participant")
+    
+    if (nrow(merged) >= 2) {
+      cat(sprintf("Wilcoxon signed-rank (paired) for %d° vs %d° (n=%d participants):\n",
+                  a1, a2, nrow(merged)))
+      # exact = FALSE handles ties/zeros and larger samples more reliably
+      res <- wilcox.test(merged$mean_a1, merged$mean_a2,
+                         paired = TRUE, exact = FALSE, alternative = "two.sided")
+      print(res)
+    } else {
+      cat(sprintf("Not enough paired data for %d° vs %d°.\n", a1, a2))
+    }
+  }
+}
 ```
